@@ -46,13 +46,21 @@ export function zoteroRequest(
 ): Promise<ZoteroResponse> {
   const { method = 'GET', headers = {}, body, timeout = DEFAULT_TIMEOUT } = opts;
 
+  // The port comes from user settings; only ever talk to a valid local port
+  const portNumber = Number(port);
+  if (!Number.isInteger(portNumber) || portNumber < 1 || portNumber > 65535) {
+    return Promise.reject(
+      new ZoteroUnreachableError(`invalid Zotero port: ${String(port)}`)
+    );
+  }
+
   return new Promise((resolve, reject) => {
     let settled = false;
-    let timer: ReturnType<typeof setTimeout> | undefined;
+    let timer: number | undefined;
     const finish = (fn: () => void) => {
       if (settled) return;
       settled = true;
-      clearTimeout(timer);
+      window.clearTimeout(timer);
       fn();
     };
 
@@ -65,7 +73,7 @@ export function zoteroRequest(
     }
 
     const req = http.request(
-      { host: '127.0.0.1', port, path, method, headers: reqHeaders },
+      { host: '127.0.0.1', port: portNumber, path, method, headers: reqHeaders },
       (res) => {
         let body = '';
         res.setEncoding('utf8');
@@ -90,7 +98,7 @@ export function zoteroRequest(
       }
     );
 
-    timer = setTimeout(() => {
+    timer = window.setTimeout(() => {
       finish(() => {
         req.destroy();
         reject(

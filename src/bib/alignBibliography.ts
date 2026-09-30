@@ -1,3 +1,5 @@
+import type { CiteprocEngine } from './citeprocTypes';
+
 /**
  * Some citation styles deliberately leave certain item types out of the
  * bibliography (e.g. Chicago author-date omits interviews and personal
@@ -16,7 +18,9 @@ export function alignEntryIds(
   if (ids.length === entryCount) return ids.slice();
 
   const kept = ids.filter((id) => !isSuppressed(id));
-  if (kept.length !== entryCount) return new Array(entryCount).fill(null);
+  if (kept.length !== entryCount) {
+    return Array.from({ length: entryCount }, (): string | null => null);
+  }
   return kept;
 }
 
@@ -25,18 +29,21 @@ export function alignEntryIds(
  * bibliography, by rendering it alone in a throwaway engine. (The real engine
  * can't be used: probing it would disturb the citation state it is holding.)
  */
-export function makeSuppressionProbe(createEngine: () => any) {
-  let probe: any;
+export function makeSuppressionProbe(
+  createEngine: () => Pick<CiteprocEngine, 'updateItems' | 'makeBibliography'>
+) {
+  let probe: ReturnType<typeof createEngine> | undefined;
   const cache = new Map<string, boolean>();
 
   return (id: string): boolean => {
-    if (cache.has(id)) return cache.get(id) as boolean;
+    const known = cache.get(id);
+    if (known !== undefined) return known;
     let suppressed = false;
     try {
       probe = probe ?? createEngine();
       probe.updateItems([id]);
       const bib = probe.makeBibliography();
-      suppressed = !bib || !bib[1]?.length;
+      suppressed = !bib || !bib[1].length;
     } catch (e) {
       console.error('Error probing bibliography entry', id, e);
     }

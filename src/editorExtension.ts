@@ -13,8 +13,9 @@ import { NodeProp, Tree } from '@lezer/common';
 
 // Obsidian ships a fork of @codemirror/language that exports tokenClassNodeProp;
 // the published typings don't know about it.
-const tokenClassNodeProp: NodeProp<string> = (cmLanguage as any)
-  .tokenClassNodeProp;
+const tokenClassNodeProp: NodeProp<string> = (
+  cmLanguage as unknown as { tokenClassNodeProp: NodeProp<string> }
+).tokenClassNodeProp;
 import {
   Keymap,
   editorInfoField,
@@ -112,8 +113,8 @@ class CiteWidget extends WidgetType {
           span.addClass('is-link');
           span.addEventListener('click', (evt) => {
             const newPane = Keymap.isModEvent(evt);
-            activeWindow.setTimeout(() => {
-              app.workspace.openLinkText(
+            window.setTimeout(() => {
+              void app.workspace.openLinkText(
                 this.linkText,
                 this.sourcePath,
                 newPane
@@ -166,7 +167,9 @@ export const citeKeyPlugin = ViewPlugin.fromClass(
         update.transactions.some((tr) =>
           tr.effects.some(
             (e) =>
-              e.is(setCiteKeyCache) || e.value?.field === editorLivePreviewField
+              e.is(setCiteKeyCache) ||
+              (e.value as { field?: unknown } | undefined)?.field ===
+                editorLivePreviewField
           )
         ) ||
         (update.view.state.field(editorLivePreviewField) &&

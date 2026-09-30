@@ -10,6 +10,7 @@ import {
   Platform,
 } from 'obsidian';
 import { PartialCSLEntry } from 'src/bib/types';
+import { asSuggestPopup } from 'src/obsidianInternals';
 import ReferenceList from 'src/main';
 
 interface Loading {
@@ -31,14 +32,15 @@ export class CiteSuggest extends EditorSuggest<
     this.app = app;
     this.plugin = plugin;
 
-    (this as any).suggestEl.addClass('pwc-suggest');
-    (this as any).scope.register(['Mod'], 'Enter', (evt: KeyboardEvent) => {
-      (this as any).suggestions.useSelectedItem(evt);
+    const popup = asSuggestPopup(this);
+    popup.suggestEl.addClass('pwc-suggest');
+    popup.scope.register(['Mod'], 'Enter', (evt: KeyboardEvent) => {
+      popup.suggestions?.useSelectedItem(evt);
       return false;
     });
 
-    (this as any).scope.register(['Alt'], 'Enter', (evt: KeyboardEvent) => {
-      (this as any).suggestions.useSelectedItem(evt);
+    popup.scope.register(['Alt'], 'Enter', (evt: KeyboardEvent) => {
+      popup.suggestions?.useSelectedItem(evt);
       return false;
     });
 
@@ -180,7 +182,7 @@ export class CiteSuggest extends EditorSuggest<
     if (changed && this.context) {
       try {
         const suggestions = this.getSuggestions(this.context) || [];
-        (this as any).suggestions?.setSuggestions(suggestions);
+        asSuggestPopup(this).suggestions?.setSuggestions(suggestions);
       } catch (e) {
         console.error('Error updating citation suggestions', e);
       }
@@ -207,7 +209,7 @@ export class CiteSuggest extends EditorSuggest<
     this.lastSelect = null;
 
     if (!this.context && pullFromZotero) {
-      this.refreshZBib();
+      void this.refreshZBib();
     }
 
     const triggerIndex = match.index + match[1].length;

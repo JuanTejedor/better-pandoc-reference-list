@@ -36,9 +36,12 @@ async function rpc<T>(port: string, method: string, params?: unknown[]) {
   if (res.status !== 200) {
     throw new ZoteroHttpError(res.status, method, res.body);
   }
-  const parsed = JSON.parse(res.body);
+  const parsed = JSON.parse(res.body) as {
+    error?: { message?: string };
+    result?: T;
+  };
   if (parsed.error?.message) throw new Error(parsed.error.message);
-  return parsed.result as T;
+  return parsed.result;
 }
 
 export async function listBbtLibraries(port: string): Promise<ZoteroLibrary[]> {
@@ -77,7 +80,7 @@ export async function exportBbtLibrary(
 
     // Validate *before* anyone caches it: an error page or a truncated body
     // must never replace a good cache.
-    const parsed = JSON.parse(res.body);
+    const parsed = JSON.parse(res.body) as unknown;
     if (!Array.isArray(parsed)) {
       lastError = new Error(`Unexpected Better BibTeX export from ${path}`);
       continue;
@@ -86,6 +89,13 @@ export async function exportBbtLibrary(
   }
 
   throw lastError ?? new Error('Better BibTeX export failed');
+}
+
+interface BbtExportItem {
+  citekey?: string;
+  citationKey?: string;
+  select?: string;
+  attachments?: Array<{ path?: string }>;
 }
 
 export interface BbtItemLinks {
@@ -100,21 +110,20 @@ export async function fetchBbtLinks(
   citekeys: string[],
   libraryId: number
 ): Promise<BbtItemLinks[]> {
-  const result = await rpc<any>(port, 'item.export', [
+  const result = await rpc<unknown>(port, 'item.export', [
     citekeys,
     CSL_JSON_TRANSLATOR,
     libraryId,
   ]);
-  const items: any[] = Array.isArray(result)
-    ? JSON.parse(result[2]).items
-    : JSON.parse(result).items;
+  const raw = Array.isArray(result) ? (result as string[])[2] : (result as string);
+  const items = (JSON.parse(raw) as { items?: BbtExportItem[] }).items ?? [];
 
-  return (items ?? []).flatMap((item) => {
+  return items.flatMap((item) => {
     const citekey = item.citekey || item.citationKey;
     if (!citekey) return [];
     const pdfPaths = (item.attachments ?? [])
-      .map((a: { path?: string }) => a.path)
+      .map((a) => a.path)
       .filter((p: string | undefined): p is string => !!p && /\.pdf$/i.test(p));
-    return [{ citekey, select: item.select as string | undefined, pdfPaths }];
+    return [{ citekey, select: item.select, pdfPaths }];
   });
 }

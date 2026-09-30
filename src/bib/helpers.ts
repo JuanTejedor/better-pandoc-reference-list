@@ -1,8 +1,11 @@
-import { execa } from 'execa';
+import { execFile } from 'child_process';
 import fs from 'fs';
+import { promisify } from 'util';
 import path from 'path';
 import https from 'https';
 import { PartialCSLEntry } from './types';
+
+const execFileAsync = promisify(execFile);
 
 export const DEFAULT_ZOTERO_PORT = '23119';
 
@@ -41,9 +44,9 @@ export async function bibToCSL(
       fs.readFile(bibPath, (err, data) => {
         if (err) return rej(err);
         try {
-          res(JSON.parse(data.toString()));
+          res(JSON.parse(data.toString()) as PartialCSLEntry[]);
         } catch (e) {
-          rej(e);
+          rej(e instanceof Error ? e : new Error(String(e)));
         }
       });
     });
@@ -59,13 +62,16 @@ export async function bibToCSL(
 
   const args = [bibPath, '-t', 'csljson', '--quiet'];
 
-  const res = await execa(pathToPandoc, args);
+  // No shell involved: the path and arguments are passed to pandoc as-is
+  const { stdout, stderr } = await execFileAsync(pathToPandoc, args, {
+    maxBuffer: 256 * 1024 * 1024,
+  });
 
-  if (res.stderr) {
-    throw new Error(`bibToCSL: ${res.stderr}`);
+  if (stderr) {
+    throw new Error(`bibToCSL: ${stderr}`);
   }
 
-  return JSON.parse(res.stdout);
+  return JSON.parse(stdout) as PartialCSLEntry[];
 }
 
 function fetchText(url: string, what: string): Promise<string> {

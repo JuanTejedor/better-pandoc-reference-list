@@ -47,7 +47,9 @@ describe('with a real citeproc engine', () => {
   it('reproduces the length mismatch and realigns it', () => {
     const engine = createEngine();
     engine.updateItems(['zed', 'talk', 'alpha']);
-    const [meta, entries] = engine.makeBibliography();
+    const bib = engine.makeBibliography();
+    if (!bib) throw new Error('no bibliography');
+    const [meta, entries] = bib;
     const ids = meta.entry_ids.map((e: string[]) => e[0]);
 
     // the style sorts by title: Alpha, An interview, Zed

@@ -233,6 +233,20 @@ describe('native provider', () => {
     expect(updates[0].entries).toHaveLength(350);
   });
 
+  it('refuses malformed item keys and ports instead of building URLs from them', async () => {
+    zotero.addItem({ key: 'AAAA1111', citationKey: 'smith2020' });
+    await sync.sync();
+    const tampered = { ...updates[0].entries[0], zoteroKey: '../../etc/passwd' };
+
+    expect((await sync.getLinks([tampered])).size).toBe(0);
+
+    settings.port = 'not-a-port';
+    sync.destroy();
+    sync = makeSync();
+    expect(await sync.sync({ force: true })).toBe(false);
+    expect(sync.status).toBe('offline');
+  });
+
   it('shares one request between concurrent syncs', async () => {
     zotero.addItem({ key: 'AAAA1111', citationKey: 'smith2020' });
     zotero.delayMs = 30;

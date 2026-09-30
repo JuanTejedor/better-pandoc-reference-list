@@ -1,3 +1,4 @@
+import type { CiteprocEngine } from 'src/bib/citeprocTypes';
 import { Citation, CitationGroup, RenderedCitation } from './parser';
 
 export type CiteMode = 'suppress-author' | 'composite' | 'author-only';
@@ -125,17 +126,40 @@ export function getCiteprocCites(
   return { output, idToGroup };
 }
 
-function decodeHtml(str: string) {
-  const txt = document.createElement('textarea');
-  txt.innerHTML = str;
-  return txt.value;
+const NAMED_ENTITIES: Record<string, string> = {
+  amp: '&',
+  lt: '<',
+  gt: '>',
+  quot: '"',
+  apos: "'",
+  nbsp: '\u00a0',
+};
+
+/**
+ * Decodes the character references citeproc emits (`&#38;`, `&amp;`...) in a
+ * single pass, leaving any markup untouched. Done by hand rather than through
+ * the DOM so no string is ever assigned to innerHTML.
+ */
+export function decodeHtml(str: string) {
+  return str.replace(
+    /&(?:#(\d+)|#[xX]([0-9a-fA-F]+)|([a-zA-Z]+));/g,
+    (match, dec?: string, hex?: string, name?: string) => {
+      if (name) return NAMED_ENTITIES[name] ?? match;
+      const code = dec ? parseInt(dec, 10) : parseInt(hex, 16);
+      try {
+        return String.fromCodePoint(code);
+      } catch {
+        return match;
+      }
+    }
+  );
 }
 
 function sanitize(val: string) {
   return decodeHtml(val.replace(/\[NO_PRINTED_FORM\] */g, ''));
 }
 
-export function cite(engine: any, group: CitationGroup[]) {
+export function cite(engine: CiteprocEngine, group: CitationGroup[]) {
   const { output, idToGroup } = getCiteprocCites(group, engine.opt.xclass);
 
   const makeCites: CiteprocCite[] = [];

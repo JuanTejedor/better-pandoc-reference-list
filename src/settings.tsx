@@ -17,6 +17,12 @@ import { cslListRaw } from './bib/cslList';
 import { langListRaw } from './bib/cslLangList';
 import { ZoteroPullSetting } from './settings/ZoteroPullSetting';
 import { ZoteroSource } from './zotero/types';
+import { pickFile } from './helpers';
+
+interface SelectOption {
+  value: string;
+  label?: string;
+}
 
 export const GUIDE_URL =
   'https://github.com/JuanTejedor/better-pandoc-reference-list#how-it-works';
@@ -99,7 +105,7 @@ export class ReferenceListSettingsTab extends PluginSettingTab {
           input = text;
           text.setValue(this.plugin.settings.pathToPandoc).onChange((value) => {
             this.plugin.settings.pathToPandoc = value;
-            this.plugin.saveSettings();
+            void this.plugin.saveSettings();
           });
         });
 
@@ -113,7 +119,7 @@ export class ReferenceListSettingsTab extends PluginSettingTab {
                   input.setValue(pathToPandoc);
 
                   this.plugin.settings.pathToPandoc = pathToPandoc;
-                  this.plugin.saveSettings();
+                  void this.plugin.saveSettings();
                 } else {
                   new Notice(
                     t(
@@ -150,9 +156,9 @@ export class ReferenceListSettingsTab extends PluginSettingTab {
             .onChange((value) => {
               const prev = this.plugin.settings.pathToBibliography;
               this.plugin.settings.pathToBibliography = value;
-              this.plugin.saveSettings(() => {
+              void this.plugin.saveSettings(() => {
                 this.plugin.bibManager.clearWatcher(prev);
-                this.plugin.bibManager.reinit(true);
+                void this.plugin.bibManager.reinit(true);
               });
             });
         });
@@ -161,15 +167,13 @@ export class ReferenceListSettingsTab extends PluginSettingTab {
           b.setIcon('folder');
           b.setTooltip(t('Select a bibliography file.'));
           b.onClick(() => {
-            const path = require('electron').remote.dialog.showOpenDialogSync({
-              properties: ['openFile'],
-            });
+            const picked = pickFile();
 
-            if (path && path.length) {
-              input.setValue(path[0]);
+            if (picked) {
+              input.setValue(picked);
 
-              this.plugin.settings.pathToBibliography = path[0];
-              this.plugin.saveSettings(() =>
+              this.plugin.settings.pathToBibliography = picked;
+              void this.plugin.saveSettings(() =>
                 this.plugin.bibManager.reinit(true)
               );
             }
@@ -196,9 +200,9 @@ export class ReferenceListSettingsTab extends PluginSettingTab {
           defaultValue={defaultStyle}
           loadOptions={loadCSLOptions}
           isClearable
-          onChange={(selection: any) => {
+          onChange={(selection: SelectOption | null) => {
             this.plugin.settings.cslStyleURL = selection?.value;
-            this.plugin.saveSettings(() =>
+            void this.plugin.saveSettings(() =>
               this.plugin.bibManager.reinit(false)
             );
           }}
@@ -221,7 +225,7 @@ export class ReferenceListSettingsTab extends PluginSettingTab {
           input = text;
           text.setValue(this.plugin.settings.cslStylePath).onChange((value) => {
             this.plugin.settings.cslStylePath = value;
-            this.plugin.saveSettings(() =>
+            void this.plugin.saveSettings(() =>
               this.plugin.bibManager.reinit(false)
             );
           });
@@ -231,15 +235,13 @@ export class ReferenceListSettingsTab extends PluginSettingTab {
           b.setIcon('folder');
           b.setTooltip(t('Select a CSL file located on your computer'));
           b.onClick(() => {
-            const path = require('electron').remote.dialog.showOpenDialogSync({
-              properties: ['openFile'],
-            });
+            const picked = pickFile();
 
-            if (path && path.length) {
-              input.setValue(path[0]);
+            if (picked) {
+              input.setValue(picked);
 
-              this.plugin.settings.cslStylePath = path[0];
-              this.plugin.saveSettings(() =>
+              this.plugin.settings.cslStylePath = picked;
+              void this.plugin.saveSettings(() =>
                 this.plugin.bibManager.reinit(false)
               );
             }
@@ -277,9 +279,9 @@ export class ReferenceListSettingsTab extends PluginSettingTab {
           defaultValue={defaultLanguage}
           loadOptions={loadCSLLangOptions}
           isClearable
-          onChange={(selection: any) => {
-            this.plugin.settings.cslLang = selection.value;
-            this.plugin.saveSettings(() =>
+          onChange={(selection: SelectOption | null) => {
+            this.plugin.settings.cslLang = selection?.value;
+            void this.plugin.saveSettings(() =>
               this.plugin.bibManager.reinit(false)
             );
           }}
@@ -295,7 +297,7 @@ export class ReferenceListSettingsTab extends PluginSettingTab {
       .addToggle((text) =>
         text.setValue(!!this.plugin.settings.hideLinks).onChange((value) => {
           this.plugin.settings.hideLinks = value;
-          this.plugin.saveSettings();
+          void this.plugin.saveSettings();
         })
       );
 
@@ -311,7 +313,7 @@ export class ReferenceListSettingsTab extends PluginSettingTab {
           .setValue(!!this.plugin.settings.renderCitations)
           .onChange((value) => {
             this.plugin.settings.renderCitations = value;
-            this.plugin.saveSettings();
+            void this.plugin.saveSettings();
           })
       );
 
@@ -327,7 +329,7 @@ export class ReferenceListSettingsTab extends PluginSettingTab {
           .setValue(!!this.plugin.settings.renderCitationsReadingMode)
           .onChange((value) => {
             this.plugin.settings.renderCitationsReadingMode = value;
-            this.plugin.saveSettings();
+            void this.plugin.saveSettings();
           })
       );
 
@@ -343,7 +345,7 @@ export class ReferenceListSettingsTab extends PluginSettingTab {
           .setValue(!!this.plugin.settings.renderLinkCitations)
           .onChange((value) => {
             this.plugin.settings.renderLinkCitations = value;
-            this.plugin.saveSettings();
+            void this.plugin.saveSettings();
           })
       );
 
@@ -359,7 +361,7 @@ export class ReferenceListSettingsTab extends PluginSettingTab {
           .setValue(!!this.plugin.settings.enableCiteKeyCompletion)
           .onChange((value) => {
             this.plugin.settings.enableCiteKeyCompletion = value;
-            this.plugin.saveSettings();
+            void this.plugin.saveSettings();
           })
       );
 
@@ -375,7 +377,7 @@ export class ReferenceListSettingsTab extends PluginSettingTab {
           .setValue(!!this.plugin.settings.showCitekeyTooltips)
           .onChange((value) => {
             this.plugin.settings.showCitekeyTooltips = value;
-            this.plugin.saveSettings();
+            void this.plugin.saveSettings();
           })
       );
 
@@ -388,12 +390,11 @@ export class ReferenceListSettingsTab extends PluginSettingTab {
       )
       .addSlider((slider) => {
         slider
-          .setDynamicTooltip()
           .setLimits(0, 7000, 100)
           .setValue(this.plugin.settings.tooltipDelay)
           .onChange((value) => {
             this.plugin.settings.tooltipDelay = value;
-            this.plugin.saveSettings();
+            void this.plugin.saveSettings();
           });
       });
   }

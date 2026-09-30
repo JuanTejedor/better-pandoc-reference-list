@@ -1,4 +1,4 @@
-import { CiteprocCite, cite, getCiteprocCites } from '../citeproc';
+import { CiteprocCite, cite, decodeHtml, getCiteprocCites } from '../citeproc';
 import CSL from 'citeproc';
 import { locales, styles } from './styles';
 import {
@@ -722,5 +722,21 @@ describe('citation prefixes after separators', () => {
       { id: 'item1', prefix: 'So' },
       { id: 'item2', prefix: 'see also' },
     ]);
+  });
+});
+
+describe('decodeHtml()', () => {
+  it('decodes numeric and basic named references once', () => {
+    expect(decodeHtml('Smith &#38; Jones &amp; Co &#x26; &lt;b&gt; &quot;q&quot;')).toBe(
+      'Smith & Jones & Co & <b> "q"'
+    );
+    // a single pass: an escaped entity stays literal text
+    expect(decodeHtml('&#38;amp;')).toBe('&amp;');
+  });
+
+  it('keeps markup and unknown references as they are', () => {
+    expect(decodeHtml('<i>x</i> &unknown; &#99999999999;')).toBe(
+      '<i>x</i> &unknown; &#99999999999;'
+    );
   });
 });

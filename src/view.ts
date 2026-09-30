@@ -3,6 +3,7 @@ import { ItemView, MarkdownView, WorkspaceLeaf, setIcon } from 'obsidian';
 import { copyElToClipboard } from './helpers';
 import { t } from './lang/helpers';
 import ReferenceList from './main';
+import { getRootSide } from './obsidianInternals';
 
 // Distinct from the original plugin's 'ReferenceListView' so both can be installed side by side.
 export const viewType = 'BetterReferenceListView';
@@ -31,7 +32,7 @@ export class ReferenceListView extends ItemView {
         const leafRoot = this.leaf.getRoot();
         if (leafRoot) {
           const tooltipPos =
-            (leafRoot as any).side === 'right' ? 'left' : 'right';
+            getRootSide(leafRoot) === 'right' ? 'left' : 'right';
           e.setAttribute('aria-label-position', tooltipPos);
         }
       });

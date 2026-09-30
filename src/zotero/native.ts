@@ -36,7 +36,15 @@ const API_HEADERS = { 'Zotero-API-Version': '3' };
 const PAGE_SIZE = 100;
 const PROBE_TIMEOUT = 2500;
 
+/** Zotero item keys are short alphanumeric strings; anything else is refused. */
+export function isItemKey(key: string): boolean {
+  return /^[A-Za-z0-9]{1,32}$/.test(key);
+}
+
 export function apiBase(library: Pick<ZoteroLibrary, 'id'>) {
+  if (!Number.isInteger(library.id) || library.id < 1) {
+    throw new Error(`Invalid Zotero library id: ${String(library.id)}`);
+  }
   return library.id === USER_LIBRARY_ID
     ? '/api/users/0'
     : `/api/groups/${library.id}`;
@@ -166,19 +174,21 @@ export async function fetchChangedItems(
 
 function parseCsl(raw: RawItem): PartialCSLEntry | null {
   if (!raw.csljson) return null;
-  let csl: any;
+  let csl: Record<string, unknown> | undefined;
   try {
-    const parsed = JSON.parse(raw.csljson);
-    csl = Array.isArray(parsed) ? parsed[0] : parsed;
+    const parsed = JSON.parse(raw.csljson) as unknown;
+    csl = (Array.isArray(parsed) ? parsed[0] : parsed) as
+      | Record<string, unknown>
+      | undefined;
   } catch {
     return null;
   }
   // Items with no citation key (standalone attachments, notes, or libraries
   // that never generated keys) cannot be cited, so they are not listed.
   const key = csl?.['citation-key'];
-  if (!key || typeof key !== 'string') return null;
+  if (!csl || !key || typeof key !== 'string') return null;
   csl.id = key;
-  return csl as PartialCSLEntry;
+  return csl as unknown as PartialCSLEntry;
 }
 
 /** Keys of every top-level item in the library (used to detect deletions). */
@@ -206,12 +216,14 @@ export async function fetchAllKeys(
 }
 
 export function selectUri(library: ZoteroLibrary, itemKey: string) {
+  if (!isItemKey(itemKey)) throw new Error('Invalid Zotero item key');
   return library.id === USER_LIBRARY_ID
     ? `zotero://select/library/items/${itemKey}`
     : `zotero://select/groups/${library.id}/items/${itemKey}`;
 }
 
 function openPdfUri(library: ZoteroLibrary, attachmentKey: string) {
+  if (!isItemKey(attachmentKey)) throw new Error('Invalid Zotero item key');
   return library.id === USER_LIBRARY_ID
     ? `zotero://open-pdf/library/items/${attachmentKey}`
     : `zotero://open-pdf/groups/${library.id}/items/${attachmentKey}`;
@@ -223,6 +235,7 @@ export async function fetchPdfLinks(
   library: ZoteroLibrary,
   itemKey: string
 ): Promise<string[]> {
+  if (!isItemKey(itemKey)) throw new Error('Invalid Zotero item key');
   const path = `${apiBase(library)}/items/${itemKey}/children?format=json`;
   const res = await get(port, path);
   assertOk(res, path, library);

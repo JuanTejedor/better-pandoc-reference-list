@@ -18,7 +18,7 @@ function validateGroups(
   });
 
   plugin.settings.zoteroGroups = validated;
-  plugin.saveSettings();
+  void plugin.saveSettings();
 }
 
 export function ZoteroPullSetting({ plugin }: { plugin: ReferenceList }) {
@@ -53,7 +53,7 @@ export function ZoteroPullSetting({ plugin }: { plugin: ReferenceList }) {
   }, []);
 
   React.useEffect(() => {
-    pullUserGroups();
+    void pullUserGroups();
   }, []);
 
   return (
@@ -77,7 +77,7 @@ export function ZoteroPullSetting({ plugin }: { plugin: ReferenceList }) {
                     setActiveGroups([...activeGroups]);
                   }
                 }
-                plugin.saveSettings(() => plugin.bibManager.reinit(true));
+                void plugin.saveSettings(() => plugin.bibManager.reinit(true));
                 return !cur;
               });
             }}
@@ -101,7 +101,12 @@ export function ZoteroPullSetting({ plugin }: { plugin: ReferenceList }) {
                 : t('Start Zotero and try again.')
             }
           >
-            <button onClick={pullUserGroups} className="mod-cta">
+            <button
+              onClick={() => {
+                void pullUserGroups();
+              }}
+              className="mod-cta"
+            >
               Retry
             </button>
           </SettingItem>
@@ -122,8 +127,8 @@ export function ZoteroPullSetting({ plugin }: { plugin: ReferenceList }) {
                 onChange={(e) => {
                   plugin.settings.zoteroSource = e.target
                     .value as ZoteroSource;
-                  plugin.saveSettings(() => plugin.bibManager.reinit(true));
-                  pullUserGroups();
+                  void plugin.saveSettings(() => plugin.bibManager.reinit(true));
+                  void pullUserGroups();
                 }}
               >
                 <option value="auto">{t('Automatic (recommended)')}</option>
@@ -142,7 +147,7 @@ export function ZoteroPullSetting({ plugin }: { plugin: ReferenceList }) {
               <input
                 onChange={(e) => {
                   plugin.settings.zoteroPort = e.target.value;
-                  plugin.saveSettings();
+                  void plugin.saveSettings();
                 }}
                 type="text"
                 spellCheck={false}
@@ -170,7 +175,7 @@ export function ZoteroPullSetting({ plugin }: { plugin: ReferenceList }) {
                           plugin.settings.zoteroGroups = activeGroups;
                           setActiveGroups([...activeGroups]);
                         }
-                        plugin.saveSettings(() =>
+                        void plugin.saveSettings(() =>
                           plugin.bibManager.reinit(true)
                         );
                       }}

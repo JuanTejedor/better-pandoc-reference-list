@@ -135,7 +135,8 @@ body {
   gap: var(--size-4-2);
 }
 
-.csl-entry:has(> div + div) {
+/* Set from code on entries with a label column (numbered styles); avoids :has() */
+.csl-entry.pwc-entry-columns {
   display: flex;
 }
 
@@ -296,9 +297,11 @@ body {
   font-size: var(--font-ui-small);
 }
 
-.pwc-multiselect input {
-  outline: none !important;
-  box-shadow: none !important;
+.pwc-multiselect input,
+.pwc-multiselect input:focus,
+.pwc-multiselect input:focus-visible {
+  outline: none;
+  box-shadow: none;
   font-size: var(--font-ui-small);
   height: unset;
 }
@@ -308,8 +311,8 @@ body {
   align-items: stretch;
 }
 
-.pwc-setting-item-wrapper > div {
-  margin-right: 0 !important;
+.setting-item.pwc-setting-item-wrapper > div {
+  margin-right: 0;
 }
 
 .pwc-setting-item-wrapper > div:last-child {

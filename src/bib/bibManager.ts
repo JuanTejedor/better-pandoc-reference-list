@@ -1,4 +1,3 @@
-import { EditorView } from '@codemirror/view';
 import CSL from 'citeproc';
 import ReferenceList from 'src/main';
 import { PartialCSLEntry } from './types';
@@ -33,6 +32,8 @@ import { alignEntryIds, makeSuppressionProbe } from './alignBibliography';
 import path from 'path';
 import { FSWatcher, watch, existsSync } from 'fs';
 import { app } from 'src/obsidianApp';
+import type { CiteprocEngine } from './citeprocTypes';
+import { getEditorView, getPreviewRenderer } from 'src/obsidianInternals';
 
 const fuseSettings = {
   includeMatches: true,
@@ -63,7 +64,7 @@ export interface FileCache {
   source: {
     bibCache?: Map<string, PartialCSLEntry>;
     fuse?: Fuse<PartialCSLEntry>;
-    engine?: any;
+    engine?: CiteprocEngine;
   };
 }
 
@@ -75,17 +76,15 @@ function getScopedSettings(file: TFile): ScopedSettings {
     return null;
   }
 
-  const { frontmatter } = metadata;
+  const frontmatter = metadata.frontmatter as Record<string, unknown>;
 
-  output.bibliography = frontmatter.bibliography?.trim() || undefined;
-  output.style =
-    frontmatter.csl?.trim() ||
-    frontmatter['citation-style']?.trim() ||
-    undefined;
-  output.lang =
-    frontmatter.lang?.trim() ||
-    frontmatter['citation-language']?.trim() ||
-    undefined;
+  // Frontmatter is user-written YAML: a value may be a list or a number
+  const text = (value: unknown) =>
+    typeof value === 'string' ? value.trim() || undefined : undefined;
+
+  output.bibliography = text(frontmatter.bibliography);
+  output.style = text(frontmatter.csl) || text(frontmatter['citation-style']);
+  output.lang = text(frontmatter.lang) || text(frontmatter['citation-language']);
 
   if (Object.values(output).every((v) => !v)) {
     return null;
@@ -145,7 +144,7 @@ export class BibManager {
 
   bibCache: Map<string, PartialCSLEntry> = new Map();
   fuse: Fuse<PartialCSLEntry>;
-  engine: any;
+  engine: CiteprocEngine | null;
 
   zCitekeyToLinks: Map<string, string> = new Map();
   zCitekeyToPDFLinks: Map<string, Array<{ url: string; label: string }>> =
@@ -158,7 +157,9 @@ export class BibManager {
   constructor(plugin: ReferenceList) {
     this.plugin = plugin;
     this.zsync = new ZoteroSync(this.zoteroHost());
-    this.zsync.onUpdate = (update) => this.applyZoteroUpdate(update);
+    this.zsync.onUpdate = (update) => {
+      void this.applyZoteroUpdate(update);
+    };
     this.initPromise = new PromiseCapability();
     this.fileCache = new LRUCache({
       max: 10,
@@ -205,7 +206,7 @@ export class BibManager {
       // background and re-renders when (and only if) something changed.
       await this.loadGlobalZBib();
       this.initPromise.resolve();
-      this.refreshGlobalZBib({ force: true });
+      void this.refreshGlobalZBib({ force: true });
       return;
     }
 
@@ -332,11 +333,11 @@ export class BibManager {
           bibPath,
           watch(bibPath, (evt) => {
             if (evt === 'change') {
-              clearTimeout(dbTimer);
-              dbTimer = activeWindow.setTimeout(() => {
-                this.loadGlobalBibFile().then(() => {
+              window.clearTimeout(dbTimer);
+              dbTimer = window.setTimeout(() => {
+                void this.loadGlobalBibFile().then(() => {
                   this.fileCache.clear();
-                  this.plugin.processReferences();
+                  void this.plugin.processReferences();
                 });
               }, 100);
             } else {
@@ -398,7 +399,7 @@ export class BibManager {
           finish: (m) => {
             if (!m) return notice.hide();
             notice.setMessage(m);
-            activeWindow.setTimeout(() => notice.hide(), 6000);
+            window.setTimeout(() => notice.hide(), 6000);
           },
         };
       },
@@ -408,7 +409,7 @@ export class BibManager {
   async loadAndRefreshGlobalZBib() {
     await this.loadGlobalZBib();
     // Deliberately not awaited: a slow first import must not block start-up.
-    this.refreshGlobalZBib({ force: true });
+    void this.refreshGlobalZBib({ force: true });
   }
 
   /** Loads the on-disk Zotero cache. Does not contact Zotero. */
@@ -429,7 +430,7 @@ export class BibManager {
 
   private async applyZoteroUpdate(update: ZoteroUpdate) {
     await this.setZoteroEntries(update.entries);
-    this.plugin.processReferences();
+    void this.plugin.processReferences();
   }
 
   private async setZoteroEntries(entries: PartialCSLEntry[]) {
@@ -510,7 +511,7 @@ export class BibManager {
   }
 
   /** A fresh engine with the same style, locale and items as `engine`. */
-  buildProbeEngine(engine: any) {
+  buildProbeEngine(engine: CiteprocEngine) {
     const b = engine.prlBuild;
     return this.buildEngine(
       b.lang,
@@ -670,10 +671,10 @@ export class BibManager {
           bibPath,
           watch(bibPath, (evt) => {
             if (evt === 'change') {
-              clearTimeout(dbTimer);
-              dbTimer = activeWindow.setTimeout(() => {
+              window.clearTimeout(dbTimer);
+              dbTimer = window.setTimeout(() => {
                 this.fileCache.delete(file);
-                this.plugin.processReferences();
+                void this.plugin.processReferences();
               }, 100);
             } else {
               this.clearWatcher(bibPath);
@@ -740,7 +741,7 @@ export class BibManager {
 
     const bib = source.engine.makeBibliography();
 
-    if (!bib?.length) {
+    if (!bib) {
       return setNull();
     }
 
@@ -827,6 +828,9 @@ export class BibManager {
     }
 
     parsed?.findAll('.csl-entry').forEach((e) => {
+      // Numbered styles render a label column next to the entry text
+      if (e.querySelector(':scope > div + div')) e.addClass('pwc-entry-columns');
+
       if (!inTooltip) {
         e.setAttribute('aria-label', t('Click to copy'));
         e.onClickEvent(() => copyElToClipboard(e));
@@ -861,7 +865,7 @@ export class BibManager {
               div.setAttr('aria-label', t('Open literature note'));
               div.onClickEvent((e) => {
                 const newPane = Keymap.isModEvent(e);
-                app.workspace.openLinkText(linkText, file.path, newPane);
+                void app.workspace.openLinkText(linkText, file.path, newPane);
               });
             });
           }
@@ -896,7 +900,7 @@ export class BibManager {
     app.workspace.getLeavesOfType('markdown').forEach((l) => {
       const view = l.view as MarkdownView;
       if (view.file === file) {
-        const renderer = (view.previewMode as any).renderer;
+        const renderer = getPreviewRenderer(view.previewMode);
         if (renderer) {
           renderer.lastText = null;
           for (const section of renderer.sections) {
@@ -911,8 +915,8 @@ export class BibManager {
           renderer.queueRender();
         }
 
-        const cm = (view.editor as any).cm as EditorView;
-        if (cm.dispatch) {
+        const cm = getEditorView(view.editor);
+        if (cm?.dispatch) {
           cm.dispatch({
             effects: [setCiteKeyCache.of(result)],
           });

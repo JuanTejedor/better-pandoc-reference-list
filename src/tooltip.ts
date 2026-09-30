@@ -1,4 +1,4 @@
-import { TFile } from 'obsidian';
+import { TFile, sanitizeHTMLToDom } from 'obsidian';
 
 import { t } from './lang/helpers';
 import ReferenceList from './main';
@@ -24,7 +24,7 @@ export class TooltipManager {
     if (!el.dataset.source) return;
 
     const file = app.vault.getAbstractFileByPath(el.dataset.source);
-    if (!file && !(file instanceof TFile)) {
+    if (!(file instanceof TFile)) {
       return;
     }
 
@@ -38,16 +38,16 @@ export class TooltipManager {
     if (el.dataset.noteIndex) {
       content = createDiv();
       const html = this.plugin.bibManager.getNoteForNoteIndex(
-        file as TFile,
+        file,
         el.dataset.noteIndex
       );
       content.append(...html);
     } else {
       for (const key of keys) {
         const html = this.plugin.bibManager.getBibForCiteKey(
-          file as TFile,
+          file,
           key
-        ) as HTMLElement;
+        );
 
         if (html) {
           if (!content) content = createFragment();
@@ -55,9 +55,9 @@ export class TooltipManager {
             let target = html.find('.csl-right-inline');
             if (!target) target = html.find('.csl-entry');
             if (!target) target = html;
-            const inner = target.innerHTML;
-            const clipped = clip(inner, 100, { html: true });
-            target.innerHTML = clipped;
+            const clipped = clip(target.innerHTML, 100, { html: true });
+            target.empty();
+            target.append(sanitizeHTMLToDom(clipped));
           }
           content.append(html);
         }

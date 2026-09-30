@@ -1,5 +1,4 @@
 import { FileSystemAdapter, htmlToMarkdown } from 'obsidian';
-import { shellPath } from 'shell-path';
 import { app } from 'src/obsidianApp';
 
 export function getVaultRoot() {
@@ -7,18 +6,44 @@ export function getVaultRoot() {
   return (app.vault.adapter as FileSystemAdapter).getBasePath();
 }
 
+interface ElectronApi {
+  clipboard: { write(data: { html: string; text: string }): void };
+  remote: {
+    dialog: {
+      showOpenDialogSync(options: {
+        properties: string[];
+      }): string[] | undefined;
+    };
+  };
+}
+
+// Obsidian's renderer exposes Electron through window.require
+function getElectron() {
+  return (window as unknown as { require(id: string): unknown }).require(
+    'electron'
+  ) as ElectronApi;
+}
+
 export function copyElToClipboard(el: HTMLElement) {
-  require('electron').clipboard.write({
+  getElectron().clipboard.write({
     html: el.outerHTML,
     text: htmlToMarkdown(el.outerHTML),
   });
+}
+
+/** Native "open file" dialog. Returns the chosen path, if any. */
+export function pickFile(): string | undefined {
+  const picked = getElectron().remote.dialog.showOpenDialogSync({
+    properties: ['openFile'],
+  });
+  return picked?.[0];
 }
 
 export class PromiseCapability<T> {
   settled = false;
   promise: Promise<T>;
   resolve: (data: T) => void;
-  reject: (reason?: any) => void;
+  reject: (reason?: unknown) => void;
 
   constructor() {
     this.promise = new Promise((resolve, reject) => {
@@ -28,31 +53,14 @@ export class PromiseCapability<T> {
       };
 
       this.reject = (reason) => {
-        reject(reason);
+        reject(
+          reason instanceof Error
+            ? reason
+            : new Error(typeof reason === 'string' ? reason : 'Unknown error')
+        );
         this.settled = true;
       };
     });
-  }
-}
-
-export async function fixPath() {
-  if (process.platform === 'win32') {
-    return;
-  }
-
-  try {
-    const path = await shellPath();
-
-    process.env.PATH =
-      path ||
-      [
-        './node_modules/.bin',
-        '/.nodebrew/current/bin',
-        '/usr/local/bin',
-        process.env.PATH,
-      ].join(':');
-  } catch (e) {
-    console.error(e);
   }
 }
 

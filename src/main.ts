@@ -25,10 +25,12 @@ import {
 } from './settings';
 import { TooltipManager } from './tooltip';
 import { ReferenceListView, viewType } from './view';
-import { PromiseCapability, fixPath, getVaultRoot } from './helpers';
+import { PromiseCapability, getVaultRoot } from './helpers';
+import { fixPath } from './shellPath';
 import path from 'path';
 import { BibManager } from './bib/bibManager';
 import { setApp } from './obsidianApp';
+import { asSectionedMenu } from './obsidianInternals';
 import { CiteSuggest } from './citeSuggest/citeSuggest';
 
 export default class ReferenceList extends Plugin {
@@ -60,7 +62,7 @@ export default class ReferenceList extends Plugin {
     this.cacheDir = path.join(getVaultRoot(), '.pandoc');
     this.emitter = new Events();
     this.bibManager = new BibManager(this);
-    this.initPromise.promise
+    void this.initPromise.promise
       .then(() => {
         if (this.settings.pullFromZotero) {
           return this.bibManager.loadAndRefreshGlobalZBib();
@@ -82,13 +84,13 @@ export default class ReferenceList extends Plugin {
     ]);
 
     // No need to block execution
-    fixPath().then(async () => {
+    void fixPath().then(async () => {
       if (!this.settings.pathToPandoc) {
         try {
           // Attempt to find if/where pandoc is located on the user's machine
           const pathToPandoc = await which('pandoc');
           this.settings.pathToPandoc = pathToPandoc;
-          this.saveSettings();
+          void this.saveSettings();
         } catch {
           // We can ignore any errors here
         }
@@ -102,7 +104,7 @@ export default class ReferenceList extends Plugin {
       id: 'focus-reference-list-view',
       name: t('Show reference list'),
       callback: async () => {
-        this.initLeaf();
+        void this.initLeaf();
       },
     });
 
@@ -122,7 +124,7 @@ export default class ReferenceList extends Plugin {
     // check is one small request when nothing changed, and is throttled.
     this.registerDomEvent(window, 'focus', () => {
       if (!this.settings.pullFromZotero || !this.bibManager) return;
-      this.bibManager.refreshGlobalZBib({ minIntervalMs: 5000 });
+      void this.bibManager.refreshGlobalZBib({ minIntervalMs: 5000 });
     });
 
     this.bibManager.zsync.onStatus = () => this.updateZoteroStatus();
@@ -142,7 +144,7 @@ export default class ReferenceList extends Plugin {
 
             const activeView = app.workspace.getActiveViewOfType(MarkdownView);
             if (activeView && file === activeView.file) {
-              this.processReferences();
+              void this.processReferences();
             }
           },
           100,
@@ -162,7 +164,7 @@ export default class ReferenceList extends Plugin {
             app.workspace.iterateRootLeaves((rootLeaf) => {
               if (rootLeaf === leaf) {
                 if (leaf.view instanceof MarkdownView) {
-                  this.processReferences();
+                  void this.processReferences();
                 } else {
                   this.view?.setNoContentMessage();
                 }
@@ -175,7 +177,7 @@ export default class ReferenceList extends Plugin {
       )
     );
 
-    (async () => {
+    void (async () => {
       this.initStatusBar();
       this.setStatusBarLoading();
 
@@ -183,7 +185,7 @@ export default class ReferenceList extends Plugin {
       await this.bibManager.initPromise.promise;
 
       this.setStatusBarIdle();
-      this.processReferences();
+      void this.processReferences();
     })();
   }
 
@@ -203,9 +205,9 @@ export default class ReferenceList extends Plugin {
     ico.addEventListener('click', () => {
       if (isOpen) return;
       const { settings } = this;
-      const menu = (new Menu() as any)
+      const menu = asSectionedMenu(new Menu())
         .addSections(['settings', 'actions'])
-        .addItem((item: any) =>
+        .addItem((item) =>
           item
             .setSection('settings')
             .setIcon('lucide-message-square')
@@ -213,10 +215,10 @@ export default class ReferenceList extends Plugin {
             .setChecked(!!settings.showCitekeyTooltips)
             .onClick(() => {
               this.settings.showCitekeyTooltips = !settings.showCitekeyTooltips;
-              this.saveSettings();
+              void this.saveSettings();
             })
         )
-        .addItem((item: any) =>
+        .addItem((item) =>
           item
             .setSection('settings')
             .setIcon('lucide-at-sign')
@@ -225,10 +227,10 @@ export default class ReferenceList extends Plugin {
             .onClick(() => {
               this.settings.enableCiteKeyCompletion =
                 !settings.enableCiteKeyCompletion;
-              this.saveSettings();
+              void this.saveSettings();
             })
         )
-        .addItem((item: any) =>
+        .addItem((item) =>
           item
             .setSection('actions')
             .setIcon('lucide-rotate-cw')
@@ -264,7 +266,7 @@ export default class ReferenceList extends Plugin {
         if (cache.source !== this.bibManager) {
           // The note uses its own bibliography file
           this.bibManager.fileCache.delete(file);
-          this.processReferences();
+          void this.processReferences();
           return;
         }
       }
@@ -285,13 +287,13 @@ export default class ReferenceList extends Plugin {
           changed ? t('Bibliography updated') : t('Bibliography is up to date')
         );
       }
-      this.processReferences();
+      void this.processReferences();
       return;
     }
 
-    this.bibManager.reinit(true);
+    void this.bibManager.reinit(true);
     await this.bibManager.initPromise.promise;
-    this.processReferences();
+    void this.processReferences();
   }
 
   updateZoteroStatus() {
@@ -350,21 +352,22 @@ export default class ReferenceList extends Plugin {
 
     const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
     if (activeView) {
-      this.processReferences();
+      void this.processReferences();
     }
   }
 
   revealLeaf() {
     const leaves = this.app.workspace.getLeavesOfType(viewType);
     if (!leaves?.length) return;
-    this.app.workspace.revealLeaf(leaves[0]);
+    void this.app.workspace.revealLeaf(leaves[0]);
   }
 
   async loadSettings() {
-    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+    const saved = (await this.loadData()) as Partial<ReferenceListSettings> | null;
+    this.settings = Object.assign({}, DEFAULT_SETTINGS, saved);
   }
 
-  async saveSettings(cb?: () => void) {
+  async saveSettings(cb?: () => void | Promise<void>) {
     document.body.toggleClass(
       'pwc-tooltips',
       !!this.settings.showCitekeyTooltips
@@ -376,16 +379,16 @@ export default class ReferenceList extends Plugin {
   }
 
   emitSettingsUpdate = debounce(
-    (cb?: () => void) => {
+    (cb?: () => void | Promise<void>) => {
       if (this.initPromise.settled) {
         this.view?.contentEl.toggleClass(
           'collapsed-links',
           !!this.settings.hideLinks
         );
 
-        cb && cb();
+        if (cb) void cb();
 
-        this.processReferences();
+        void this.processReferences();
       }
     },
     5000,

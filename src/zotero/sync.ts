@@ -78,6 +78,11 @@ function uniqueById(entries: PartialCSLEntry[]) {
   return Array.from(seen.values());
 }
 
+function describeError(e: unknown): string {
+  if (e instanceof Error) return e.message;
+  return typeof e === 'string' ? e : 'Unknown error';
+}
+
 /**
  * Progress display is cosmetic: whatever the UI does (or fails to do) must
  * never interrupt a sync.
@@ -110,7 +115,7 @@ export class ZoteroSync {
   private caches = new Map<number, LibraryCache>();
   private inflight: Promise<boolean> | null = null;
   private lastCheckAt = 0;
-  private retryTimer: ReturnType<typeof setTimeout> | null = null;
+  private retryTimer: number | null = null;
   private retryCount = 0;
   private notified = new Set<string>();
   private destroyed = false;
@@ -189,7 +194,7 @@ export class ZoteroSync {
         .map((lib) => ({ lib, cache: this.cacheFor(provider, lib.id) }))
         .filter((x) => !!x.cache);
       if (found.length) {
-        return this.buildUpdate(provider, found.map((f) => f.cache as LibraryCache), libraries);
+        return this.buildUpdate(provider, found.map((f) => f.cache), libraries);
       }
     }
     return null;
@@ -220,7 +225,7 @@ export class ZoteroSync {
   /** Resolves true when the bibliography changed. Never rejects. */
   sync(opts: SyncOptions = {}): Promise<boolean> {
     if (this.destroyed) return Promise.resolve(false);
-    if (this.inflight) return this.inflight;
+    if (this.inflight !== null) return this.inflight;
 
     const { minIntervalMs = 0, force } = opts;
     if (!force && minIntervalMs && Date.now() - this.lastCheckAt < minIntervalMs) {
@@ -228,9 +233,9 @@ export class ZoteroSync {
     }
 
     this.inflight = this.run(opts)
-      .catch((e) => {
+      .catch((e: unknown) => {
         console.error('Zotero sync failed', e);
-        this.setStatus('error', String(e?.message ?? e));
+        this.setStatus('error', describeError(e));
         return false;
       })
       .finally(() => {
@@ -279,7 +284,7 @@ export class ZoteroSync {
         this.caches.set(library.id, cache);
         used.push(cache);
         anyChanged = anyChanged || changed;
-      } catch (e: any) {
+      } catch (e: unknown) {
         if (e instanceof LocalApiDisabledError) throw e;
         if (e instanceof ZoteroUnreachableError) {
           // Zotero went away mid-sync; keep what we have and try again later.
@@ -288,7 +293,7 @@ export class ZoteroSync {
           return false;
         }
         console.error(`Error syncing Zotero library "${library.name}"`, e);
-        errors.push(`${library.name}: ${e?.message ?? e}`);
+        errors.push(`${library.name}: ${describeError(e)}`);
         if (cached) used.push(cached);
       }
     }
@@ -349,7 +354,7 @@ export class ZoteroSync {
       if (byKey.delete(key)) changed = true;
     }
     for (const it of items) {
-      byKey.set(it.key as string, it);
+      byKey.set(it.key, it);
       changed = true;
     }
 
@@ -395,7 +400,7 @@ export class ZoteroSync {
       libraryId: library.id,
       version: 0,
       syncedAt: Date.now(),
-      items: changed ? items : (cached as LibraryCache).items,
+      items: changed ? items : (cached).items,
     };
     if (changed) writeCache(this.host.cacheDir(), cache);
     return { cache, changed };
@@ -408,14 +413,14 @@ export class ZoteroSync {
     const delay =
       RETRY_DELAYS_MS[Math.min(this.retryCount, RETRY_DELAYS_MS.length - 1)];
     this.retryCount++;
-    this.retryTimer = setTimeout(() => {
+    this.retryTimer = window.setTimeout(() => {
       this.retryTimer = null;
-      this.sync({ force: true });
+      void this.sync({ force: true });
     }, delay);
   }
 
   private cancelRetry() {
-    if (this.retryTimer) clearTimeout(this.retryTimer);
+    if (this.retryTimer) window.clearTimeout(this.retryTimer);
     this.retryTimer = null;
     this.retryCount = 0;
   }
@@ -434,17 +439,19 @@ export class ZoteroSync {
 
     await Promise.all(
       native.map(async (e) => {
-        const lib = libById.get(e.groupID as number) ?? {
-          id: e.groupID as number,
+        const lib = libById.get(e.groupID) ?? {
+          id: e.groupID,
           name: String(e.groupID),
         };
-        const links: ItemLinks = {
-          select: selectUri(lib, e.zoteroKey as string),
-          pdfs: [],
-        };
+        const links: ItemLinks = { pdfs: [] };
+        try {
+          links.select = selectUri(lib, e.zoteroKey);
+        } catch {
+          return; // malformed key (e.g. a tampered cache): offer no links
+        }
         out.set(e.id, links);
         try {
-          const urls = await fetchPdfLinks(port, lib, e.zoteroKey as string);
+          const urls = await fetchPdfLinks(port, lib, e.zoteroKey);
           links.pdfs = urls.map((url) => ({ url, label: 'PDF' }));
         } catch {
           // links are a nicety; ignore
@@ -454,9 +461,9 @@ export class ZoteroSync {
 
     const byLibrary = new Map<number, string[]>();
     for (const e of other) {
-      const list = byLibrary.get(e.groupID as number) ?? [];
+      const list = byLibrary.get(e.groupID) ?? [];
       list.push(e.id);
-      byLibrary.set(e.groupID as number, list);
+      byLibrary.set(e.groupID, list);
     }
     for (const [libraryId, keys] of byLibrary) {
       try {
@@ -465,7 +472,7 @@ export class ZoteroSync {
             select: item.select,
             pdfs: item.pdfPaths.map((p) => ({
               url: `file://${encodeURI(p)}`,
-              label: p.split(/[\\/]/).pop() as string,
+              label: p.split(/[\\/]/).pop(),
             })),
           });
         }

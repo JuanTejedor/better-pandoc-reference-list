@@ -68,8 +68,8 @@ export function loadCSLOptions(
   if (inputValue === '') {
     callback([]);
   } else {
-    activeWindow.clearTimeout(loadCSLOptionsDB);
-    loadCSLOptionsDB = activeWindow.setTimeout(() => {
+    window.clearTimeout(loadCSLOptionsDB);
+    loadCSLOptionsDB = window.setTimeout(() => {
       callback(searchCSL(inputValue));
     }, 150);
   }
@@ -90,8 +90,8 @@ export function loadCSLLangOptions(
   if (inputValue === '') {
     callback([]);
   } else {
-    activeWindow.clearTimeout(loadCSLLangOptionsDB);
-    loadCSLLangOptionsDB = activeWindow.setTimeout(() => {
+    window.clearTimeout(loadCSLLangOptionsDB);
+    loadCSLLangOptionsDB = window.setTimeout(() => {
       callback(searchCSLLangs(inputValue));
     }, 150);
   }
