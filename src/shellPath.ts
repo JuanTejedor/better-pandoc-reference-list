@@ -16,7 +16,7 @@ type ExecFile = (
   file: string,
   args: string[],
   options: { timeout: number },
-  callback: (err: Error | null, stdout: string | Buffer) => void
+  callback: (err: Error | null, stdout: string | { toString(): string }) => void
 ) => unknown;
 
 export function readShellPath(

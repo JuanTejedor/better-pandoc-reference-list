@@ -1,7 +1,7 @@
-import crypto from 'crypto';
-import fs from 'fs';
-import os from 'os';
-import path from 'path';
+import * as crypto from 'crypto';
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
 import { LibraryCache, ZoteroProviderId } from './types';
 
 export const CACHE_SCHEMA = 1;

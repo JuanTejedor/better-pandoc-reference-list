@@ -118,12 +118,14 @@ export async function fetchBbtLinks(
   const raw = Array.isArray(result) ? (result as string[])[2] : (result as string);
   const items = (JSON.parse(raw) as { items?: BbtExportItem[] }).items ?? [];
 
-  return items.flatMap((item) => {
+  const links: BbtItemLinks[] = [];
+  for (const item of items) {
     const citekey = item.citekey || item.citationKey;
-    if (!citekey) return [];
+    if (!citekey) continue;
     const pdfPaths = (item.attachments ?? [])
       .map((a) => a.path)
       .filter((p: string | undefined): p is string => !!p && /\.pdf$/i.test(p));
-    return [{ citekey, select: item.select, pdfPaths }];
-  });
+    links.push({ citekey, select: item.select, pdfPaths });
+  }
+  return links;
 }

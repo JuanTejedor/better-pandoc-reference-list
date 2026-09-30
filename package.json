@@ -1,6 +1,6 @@
 {
   "name": "better-pandoc-reference-list",
-  "version": "3.0.1",
+  "version": "3.0.2",
   "description": "A maintained fork of Obsidian Pandoc Reference List",
   "main": "main.js",
   "scripts": {
@@ -28,7 +28,6 @@
     "@eslint/json": "^0.14.0",
     "@types/jest": "27.4.1",
     "@types/lru-cache": "7.6.1",
-    "@types/node": "16.11.6",
     "@types/react-dom": "18.2.6",
     "@types/which": "2.0.1",
     "@typescript-eslint/eslint-plugin": "5.2.0",
@@ -47,6 +46,7 @@
   },
   "dependencies": {
     "@lezer/common": "^1.5.3",
+    "@types/node": "16.11.6",
     "citeproc": "2.4.63",
     "fast-deep-equal": "^3.1.3",
     "fuse.js": "6.6.2",

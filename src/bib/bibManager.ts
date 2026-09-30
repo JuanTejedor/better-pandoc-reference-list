@@ -29,7 +29,7 @@ import { setCiteKeyCache } from 'src/editorExtension';
 import equal from 'fast-deep-equal';
 import { t } from 'src/lang/helpers';
 import { alignEntryIds, makeSuppressionProbe } from './alignBibliography';
-import path from 'path';
+import * as path from 'path';
 import { FSWatcher, watch, existsSync } from 'fs';
 import { app } from 'src/obsidianApp';
 import type { CiteprocEngine } from './citeprocTypes';
@@ -91,8 +91,13 @@ function getScopedSettings(file: TFile): ScopedSettings {
   }
 
   // Checks whether the bibliography is a relative path and replaces the path with an absolute one
-  if (existsSync(path.join(getVaultRoot(), path.dirname(file.path), output.bibliography))){
-    output.bibliography = path.join(getVaultRoot(), path.dirname(file.path), output.bibliography);
+  if (output.bibliography) {
+    const besideNote = path.join(
+      getVaultRoot(),
+      path.dirname(file.path),
+      output.bibliography
+    );
+    if (existsSync(besideNote)) output.bibliography = besideNote;
   }
 
   return output;

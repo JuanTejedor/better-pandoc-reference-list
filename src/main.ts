@@ -27,7 +27,7 @@ import { TooltipManager } from './tooltip';
 import { ReferenceListView, viewType } from './view';
 import { PromiseCapability, getVaultRoot } from './helpers';
 import { fixPath } from './shellPath';
-import path from 'path';
+import * as path from 'path';
 import { BibManager } from './bib/bibManager';
 import { setApp } from './obsidianApp';
 import { asSectionedMenu } from './obsidianInternals';

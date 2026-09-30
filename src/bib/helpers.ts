@@ -1,8 +1,8 @@
 import { execFile } from 'child_process';
-import fs from 'fs';
+import * as fs from 'fs';
 import { promisify } from 'util';
-import path from 'path';
-import https from 'https';
+import * as path from 'path';
+import * as https from 'https';
 import { PartialCSLEntry } from './types';
 
 const execFileAsync = promisify(execFile);
@@ -42,7 +42,7 @@ export async function bibToCSL(
   if (parsed.ext === '.json') {
     return new Promise((res, rej) => {
       fs.readFile(bibPath, (err, data) => {
-        if (err) return rej(err);
+        if (err) return rej(err instanceof Error ? err : new Error(String(err)));
         try {
           res(JSON.parse(data.toString()) as PartialCSLEntry[]);
         } catch (e) {
