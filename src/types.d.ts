@@ -1,3 +1,8 @@
+// Include Node's typings explicitly. Linters that type-check with a tsconfig
+// restricting `types` otherwise see fs, path, process and Buffer as untyped
+// and report hundreds of "unsafe any" warnings.
+/// <reference types="node" />
+
 declare module 'delegate';
 declare module 'citeproc' {
   import type {
