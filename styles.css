@@ -391,6 +391,10 @@ body {
   --icon-stroke: var(--icon-s-stroke-width);
 }
 
+.pwc-status-icon.pwc-status-warn {
+  color: var(--text-warning);
+}
+
 .pwc-status-icon.is-loading svg {
   animation: spin 2s linear infinite;
 }
