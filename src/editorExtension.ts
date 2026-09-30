@@ -1,5 +1,5 @@
+import * as cmLanguage from '@codemirror/language';
 import { syntaxTree } from '@codemirror/language';
-import { tokenClassNodeProp } from '@codemirror/language';
 import { RangeSetBuilder, StateEffect, StateField } from '@codemirror/state';
 import {
   Decoration,
@@ -9,7 +9,12 @@ import {
   ViewUpdate,
   WidgetType,
 } from '@codemirror/view';
-import { Tree } from '@lezer/common';
+import { NodeProp, Tree } from '@lezer/common';
+
+// Obsidian ships a fork of @codemirror/language that exports tokenClassNodeProp;
+// the published typings don't know about it.
+const tokenClassNodeProp: NodeProp<string> = (cmLanguage as any)
+  .tokenClassNodeProp;
 import {
   Keymap,
   editorInfoField,
@@ -26,6 +31,7 @@ import {
 import { BibManager, FileCache } from './bib/bibManager';
 import equal from 'fast-deep-equal';
 import { TooltipManager } from './tooltip';
+import { app } from 'src/obsidianApp';
 
 const ignoreListRegEx = /code|math|templater|hashtag/;
 
@@ -46,7 +52,7 @@ const citeMark = (
     'data-source': sourceFile || '',
   };
 
-  if (noteIndex) attr.noteIndex = noteIndex;
+  if (noteIndex) attr['data-note-index'] = noteIndex;
 
   return Decoration.mark({
     class: cls.join(' '),

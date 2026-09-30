@@ -4,7 +4,8 @@ import { copyElToClipboard } from './helpers';
 import { t } from './lang/helpers';
 import ReferenceList from './main';
 
-export const viewType = 'ReferenceListView';
+// Distinct from the original plugin's 'ReferenceListView' so both can be installed side by side.
+export const viewType = 'BetterReferenceListView';
 
 export class ReferenceListView extends ItemView {
   plugin: ReferenceList;

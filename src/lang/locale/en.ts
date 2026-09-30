@@ -37,8 +37,18 @@ export default {
   'When enabled, an autocomplete dialog will display when typing citation keys.':
     'When enabled, an autocomplete dialog will display when typing citation keys.',
   'Pull bibliography from Zotero': 'Pull bibliography from Zotero',
-  'When enabled, bibliography data will be pulled from Zotero rather than a bibliography file. The Better Bibtex plugin must be installed in Zotero.':
-    'When enabled, bibliography data will be pulled from Zotero rather than a bibliography file. The Better Bibtex plugin must be installed in Zotero.',
+  'When enabled, bibliography data will be pulled from Zotero rather than a bibliography file.':
+    'When enabled, bibliography data will be pulled from Zotero rather than a bibliography file.',
+  'Zotero data source': 'Zotero data source',
+  'Automatic uses Zotero and falls back to Better BibTeX.':
+    'Automatic uses Zotero and falls back to Better BibTeX.',
+  'Automatic (recommended)': 'Automatic (recommended)',
+  Zotero: 'Zotero',
+  'Better BibTeX': 'Better BibTeX',
+  'Connected to Zotero': 'Connected to Zotero',
+  'Zotero is not accepting connections': 'Zotero is not accepting connections',
+  'In Zotero, open Settings > Advanced and enable "Allow other applications on this computer to communicate with Zotero".':
+    'In Zotero, open Settings > Advanced and enable "Allow other applications on this computer to communicate with Zotero".',
   'Zotero port': 'Zotero port',
   "Use 24119 for Juris-M or specify a custom port if you have changed Zotero's default.":
     "Use 24119 for Juris-M or specify a custom port if you have changed Zotero's default.",
@@ -72,6 +82,13 @@ export default {
   'Please provide the path to your pandoc compatible bibliography file in the Pandoc Reference List plugin settings.':
     'Please provide the path to your pandoc compatible bibliography file in the Pandoc Reference List plugin settings.',
   'Refresh bibliography': 'Refresh bibliography',
+  'How this plugin works': 'How this plugin works',
+  'A short guide: where references come from, how they stay up to date, and troubleshooting.':
+    'A short guide: where references come from, how they stay up to date, and troubleshooting.',
+  'Open the guide': 'Open the guide',
+  'Rebuild Zotero cache': 'Rebuild Zotero cache',
+  'Bibliography updated': 'Bibliography updated',
+  'Bibliography is up to date': 'Bibliography is up to date',
   'Pandoc reference list settings': 'Pandoc reference list settings',
   // src/tooltip.ts
   'No citation found for ': 'No citation found for ',

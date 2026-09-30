@@ -713,3 +713,14 @@ describe('cite', () => {
     });
   });
 });
+
+describe('citation prefixes after separators', () => {
+  it('assigns text after a bare citation to the following citation', () => {
+    const [segments] = getCitationSegments('[So @item1; see also @item2]');
+
+    expect(getCitations(segments).citations).toEqual([
+      { id: 'item1', prefix: 'So' },
+      { id: 'item2', prefix: 'see also' },
+    ]);
+  });
+});

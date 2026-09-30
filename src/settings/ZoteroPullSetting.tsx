@@ -2,7 +2,8 @@ import React from 'react';
 import ReferenceList from 'src/main';
 import { SettingItem } from './SettingItem';
 import { t } from 'src/lang/helpers';
-import { DEFAULT_ZOTERO_PORT, getZUserGroups } from 'src/bib/helpers';
+import { DEFAULT_ZOTERO_PORT } from 'src/bib/helpers';
+import { ZoteroConnection, ZoteroSource } from 'src/zotero/types';
 
 function validateGroups(
   plugin: ReferenceList,
@@ -30,18 +31,24 @@ export function ZoteroPullSetting({ plugin }: { plugin: ReferenceList }) {
   const [activeGroups, setActiveGroups] = React.useState(
     plugin.settings.zoteroGroups
   );
-  const [connected, setConnected] = React.useState(false);
+  const [connection, setConnection] = React.useState<ZoteroConnection | null>(
+    null
+  );
+  const connected = connection?.state === 'ready';
 
   const pullUserGroups = React.useCallback(async () => {
     try {
-      const groups = await getZUserGroups(
-        plugin.settings.zoteroPort ?? DEFAULT_ZOTERO_PORT
-      );
+      const zsync = plugin.bibManager.zsync;
+      const conn = await zsync.connect();
+      setConnection(conn);
+      if (conn.state !== 'ready') return;
+
+      const groups = await zsync.listLibraries();
+      if (!groups) return;
       validateGroups(plugin, groups);
       setPossibleGroups(groups);
-      setConnected(true);
     } catch {
-      setConnected(false);
+      setConnection({ provider: null, state: 'unreachable' });
     }
   }, []);
 
@@ -55,7 +62,7 @@ export function ZoteroPullSetting({ plugin }: { plugin: ReferenceList }) {
         <SettingItem
           name={t('Pull bibliography from Zotero')}
           description={t(
-            'When enabled, bibliography data will be pulled from Zotero rather than a bibliography file. The Better Bibtex plugin must be installed in Zotero.'
+            'When enabled, bibliography data will be pulled from Zotero rather than a bibliography file.'
           )}
         >
           <div
@@ -78,11 +85,21 @@ export function ZoteroPullSetting({ plugin }: { plugin: ReferenceList }) {
           />
         </SettingItem>
       </div>
-      {connected ? null : (
+      {connection === null || connected ? null : (
         <div className="pwc-setting-item setting-item">
           <SettingItem
-            name={t('Cannot connect to Zotero')}
-            description={t('Start Zotero and try again.')}
+            name={
+              connection.state === 'local-api-disabled'
+                ? t('Zotero is not accepting connections')
+                : t('Cannot connect to Zotero')
+            }
+            description={
+              connection.state === 'local-api-disabled'
+                ? t(
+                    'In Zotero, open Settings > Advanced and enable "Allow other applications on this computer to communicate with Zotero".'
+                  )
+                : t('Start Zotero and try again.')
+            }
           >
             <button onClick={pullUserGroups} className="mod-cta">
               Retry
@@ -92,6 +109,29 @@ export function ZoteroPullSetting({ plugin }: { plugin: ReferenceList }) {
       )}
       {!isEnabled ? null : (
         <>
+          <div className="pwc-setting-item setting-item">
+            <SettingItem
+              name={t('Zotero data source')}
+              description={t(
+                'Automatic uses Zotero and falls back to Better BibTeX.'
+              )}
+            >
+              <select
+                className="dropdown"
+                defaultValue={plugin.settings.zoteroSource ?? 'auto'}
+                onChange={(e) => {
+                  plugin.settings.zoteroSource = e.target
+                    .value as ZoteroSource;
+                  plugin.saveSettings(() => plugin.bibManager.reinit(true));
+                  pullUserGroups();
+                }}
+              >
+                <option value="auto">{t('Automatic (recommended)')}</option>
+                <option value="native">{t('Zotero')}</option>
+                <option value="bbt">{t('Better BibTeX')}</option>
+              </select>
+            </SettingItem>
+          </div>
           <div className="pwc-setting-item setting-item">
             <SettingItem
               name={t('Zotero port')}

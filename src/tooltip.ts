@@ -3,6 +3,7 @@ import { TFile } from 'obsidian';
 import { t } from './lang/helpers';
 import ReferenceList from './main';
 import clip from 'text-clipper';
+import { app } from 'src/obsidianApp';
 
 export class TooltipManager {
   plugin: ReferenceList;

@@ -8,10 +8,11 @@ import {
   getBibPath,
   getCSLLocale,
   getCSLStyle,
-  getItemJSONFromCiteKeys,
-  getZBib,
-  refreshZBib,
+  DEFAULT_ZOTERO_PORT,
 } from './helpers';
+import { SyncOptions, ZoteroSync, ZoteroSyncHost } from 'src/zotero/sync';
+import { ZoteroUpdate } from 'src/zotero/types';
+import { zoteroCacheDir } from 'src/zotero/cache';
 import {
   PromiseCapability,
   copyElToClipboard,
@@ -23,13 +24,15 @@ import {
   getCitations,
 } from 'src/parser/parser';
 import LRUCache from 'lru-cache';
-import { Keymap, MarkdownView, TFile, setIcon } from 'obsidian';
+import { Keymap, MarkdownView, Notice, TFile, setIcon } from 'obsidian';
 import { cite } from 'src/parser/citeproc';
 import { setCiteKeyCache } from 'src/editorExtension';
 import equal from 'fast-deep-equal';
 import { t } from 'src/lang/helpers';
+import { alignEntryIds, makeSuppressionProbe } from './alignBibliography';
 import path from 'path';
 import { FSWatcher, watch, existsSync } from 'fs';
+import { app } from 'src/obsidianApp';
 
 const fuseSettings = {
   includeMatches: true,
@@ -145,12 +148,17 @@ export class BibManager {
   engine: any;
 
   zCitekeyToLinks: Map<string, string> = new Map();
-  zCitekeyToPDFLinks: Map<string, string[]> = new Map();
+  zCitekeyToPDFLinks: Map<string, Array<{ url: string; label: string }>> =
+    new Map();
 
   watcherCache: Map<string, FSWatcher> = new Map();
 
+  zsync: ZoteroSync;
+
   constructor(plugin: ReferenceList) {
     this.plugin = plugin;
+    this.zsync = new ZoteroSync(this.zoteroHost());
+    this.zsync.onUpdate = (update) => this.applyZoteroUpdate(update);
     this.initPromise = new PromiseCapability();
     this.fileCache = new LRUCache({
       max: 10,
@@ -164,6 +172,7 @@ export class BibManager {
   }
 
   destroy() {
+    this.zsync.destroy();
     this.fileCache.clear();
 
     for (const watcher of this.watcherCache.values()) {
@@ -192,11 +201,15 @@ export class BibManager {
     if (clearCache) this.bibCache.clear();
 
     if (this.plugin.settings.pullFromZotero) {
-      await this.loadGlobalZBib(false);
-    } else {
-      await this.loadGlobalBibFile(true);
+      // Show what we already have straight away; the sync runs in the
+      // background and re-renders when (and only if) something changed.
+      await this.loadGlobalZBib();
+      this.initPromise.resolve();
+      this.refreshGlobalZBib({ force: true });
+      return;
     }
 
+    await this.loadGlobalBibFile(true);
     this.initPromise.resolve();
   }
 
@@ -365,42 +378,74 @@ export class BibManager {
     }
   }
 
-  async loadAndRefreshGlobalZBib() {
-    await this.loadGlobalZBib(true);
-    await this.refreshGlobalZBib();
+  zoteroHost(): ZoteroSyncHost {
+    return {
+      getSettings: () => {
+        const { zoteroPort, zoteroSource, zoteroGroups } = this.plugin.settings;
+        return {
+          port: zoteroPort || DEFAULT_ZOTERO_PORT,
+          source: zoteroSource ?? 'auto',
+          libraries: zoteroGroups ?? [],
+        };
+      },
+      cacheDir: () => zoteroCacheDir(getVaultRoot()),
+      notify: (message) => new Notice(message, 10000),
+      startTask: (message) => {
+        // duration 0: stays until we hide it, so a slow import can be read
+        const notice = new Notice(message, 0);
+        return {
+          update: (m) => notice.setMessage(m),
+          finish: (m) => {
+            if (!m) return notice.hide();
+            notice.setMessage(m);
+            activeWindow.setTimeout(() => notice.hide(), 6000);
+          },
+        };
+      },
+    };
   }
 
-  async loadGlobalZBib(fromCache?: boolean) {
-    const { settings, cacheDir } = this.plugin;
-    if (!settings.zoteroGroups?.length) return;
+  async loadAndRefreshGlobalZBib() {
+    await this.loadGlobalZBib();
+    // Deliberately not awaited: a slow first import must not block start-up.
+    this.refreshGlobalZBib({ force: true });
+  }
 
-    const bib: PartialCSLEntry[] = [];
-    for (const group of settings.zoteroGroups) {
-      try {
-        const list = await getZBib(
-          settings.zoteroPort,
-          cacheDir,
-          group.id,
-          fromCache
-        );
-        if (list?.length) {
-          bib.push(...list);
-          group.lastUpdate = Date.now();
-        }
-      } catch (e) {
-        console.error('Error fetching bibliography from Zotero', e);
-        continue;
-      }
-    }
+  /** Loads the on-disk Zotero cache. Does not contact Zotero. */
+  async loadGlobalZBib() {
+    const cached = this.zsync.loadCached();
+    await this.setZoteroEntries(cached?.entries ?? []);
+  }
 
-    this.plugin.saveSettings();
+  /**
+   * Checks Zotero for changes and, if there are any, applies them. Safe to
+   * call often: concurrent calls share one request and unchanged libraries
+   * cost a single tiny request.
+   */
+  refreshGlobalZBib(opts: SyncOptions = {}) {
+    if (!this.plugin.settings.pullFromZotero) return Promise.resolve(false);
+    return this.zsync.sync(opts);
+  }
 
-    this.bibCache = new Map();
-    for (const entry of bib) {
+  private async applyZoteroUpdate(update: ZoteroUpdate) {
+    await this.setZoteroEntries(update.entries);
+    this.plugin.processReferences();
+  }
+
+  private async setZoteroEntries(entries: PartialCSLEntry[]) {
+    const { settings } = this.plugin;
+
+    // Mutate in place: the citeproc engine holds a reference to this Map.
+    this.bibCache.clear();
+    for (const entry of entries) {
       this.bibCache.set(entry.id, entry);
     }
+    this.setFuse(entries);
 
-    this.setFuse(bib);
+    // Links are keyed by citekey, which an edit in Zotero can reassign.
+    this.zCitekeyToLinks.clear();
+    this.zCitekeyToPDFLinks.clear();
+    this.fileCache.clear();
 
     const style =
       settings.cslStylePath ||
@@ -415,6 +460,8 @@ export class BibManager {
     if (!this.styleCache.has(style)) return;
 
     try {
+      // Rebuilt on every change: citeproc keeps its own copy of the items it
+      // has already seen, so a long-lived engine would render stale metadata.
       this.engine = this.buildEngine(
         lang,
         this.langCache,
@@ -425,43 +472,6 @@ export class BibManager {
     } catch (e) {
       console.error(e);
     }
-  }
-
-  async refreshGlobalZBib() {
-    const { settings, cacheDir } = this.plugin;
-    if (!settings.zoteroGroups?.length) return;
-
-    const bib: PartialCSLEntry[] = [];
-    const modifiedEntries: Map<string, PartialCSLEntry> = new Map();
-
-    for (const group of settings.zoteroGroups) {
-      try {
-        const res = await refreshZBib(
-          settings.zoteroPort,
-          cacheDir,
-          group.id,
-          group.lastUpdate
-        );
-        if (!res) continue;
-        if (res.list?.length) {
-          bib.push(...res.list);
-          group.lastUpdate = Date.now();
-        }
-
-        for (const [k, v] of res.modified.entries()) {
-          modifiedEntries.set(k, v);
-          this.bibCache.set(k, v);
-        }
-      } catch (e) {
-        console.error('Error fetching bibliography from Zotero', e);
-        continue;
-      }
-    }
-
-    this.plugin.saveSettings();
-    this.updateFuse(modifiedEntries);
-    this.fileCache.clear();
-    this.plugin.processReferences();
   }
 
   buildEngine(
@@ -495,7 +505,20 @@ export class BibManager {
       lang
     );
     engine.opt.development_extensions.wrap_url_and_doi = true;
+    engine.prlBuild = { lang, langCache, style, styleCache, bibCache };
     return engine;
+  }
+
+  /** A fresh engine with the same style, locale and items as `engine`. */
+  buildProbeEngine(engine: any) {
+    const b = engine.prlBuild;
+    return this.buildEngine(
+      b.lang,
+      b.langCache,
+      b.style,
+      b.styleCache,
+      b.bibCache
+    );
   }
 
   async getLangAndStyle(
@@ -725,10 +748,18 @@ export class BibManager {
     const entries = bib[1];
     const htmlStr = [metadata.bibstart];
 
-    metadata.entry_ids?.forEach((e: string, i: number) => {
-      entries[i] = entries[i].replace(/>/, ` data-citekey="${e[0]}">`);
-      citeBibMap.set(e[0], entries[i]);
-    });
+    if (metadata.entry_ids?.length) {
+      const entryIds = alignEntryIds(
+        metadata.entry_ids.map((e: string[]) => e[0]),
+        entries.length,
+        makeSuppressionProbe(() => this.buildProbeEngine(source.engine))
+      );
+      entryIds.forEach((id, i) => {
+        if (!id) return;
+        entries[i] = entries[i].replace(/>/, ` data-citekey="${id}">`);
+        citeBibMap.set(id, entries[i]);
+      });
+    }
 
     for (const entry of entries) htmlStr.push(entry);
 
@@ -763,52 +794,22 @@ export class BibManager {
   }
 
   async getZLinksForKeys(citekeys: Set<string>) {
-    const queries: Record<number, string[]> = {};
+    const missing: PartialCSLEntry[] = [];
 
     citekeys.forEach((key) => {
-      if (!this.zCitekeyToLinks.has(key)) {
-        if (!this.bibCache.has(key)) return;
-        const item = this.bibCache.get(key);
-        const id = item.groupID;
-        if (id === undefined) return;
-        if (!queries[id]) {
-          queries[id] = [];
-        }
-        queries[id].push(key);
+      if (this.zCitekeyToLinks.has(key) || this.zCitekeyToPDFLinks.has(key)) {
+        return;
       }
+      const entry = this.bibCache.get(key);
+      if (entry && entry.groupID !== undefined) missing.push(entry);
     });
 
-    for (const id of Object.keys(queries)) {
-      const groupId = Number(id);
-      try {
-        const items = await getItemJSONFromCiteKeys(
-          this.plugin.settings.zoteroPort,
-          queries[groupId],
-          groupId
-        );
-        if (items?.length) {
-          for (const item of items) {
-            const key = item.citekey || item.citationKey;
-            const link = item.select;
-            if (key && link) {
-              this.zCitekeyToLinks.set(key, link);
-              if (item.attachments?.length) {
-                const attLinks: string[] = [];
-                for (const att of item.attachments) {
-                  if (/\.pdf$/.test(att.path)) {
-                    attLinks.push(att.path);
-                  }
-                }
-                if (attLinks.length) {
-                  this.zCitekeyToPDFLinks.set(key, attLinks);
-                }
-              }
-            }
-          }
-        }
-      } catch {
-        //
-      }
+    if (!missing.length) return;
+
+    const links = await this.zsync.getLinks(missing);
+    for (const [key, link] of links) {
+      if (link.select) this.zCitekeyToLinks.set(key, link.select);
+      if (link.pdfs.length) this.zCitekeyToPDFLinks.set(key, link.pdfs);
     }
   }
 
@@ -877,9 +878,9 @@ export class BibManager {
             zPDFLinks.forEach((link) => {
               div.createDiv('clickable-icon', (div) => {
                 setIcon(div, 'lucide-file-text');
-                div.setAttr('aria-label', path.parse(link).base);
+                div.setAttr('aria-label', link.label);
                 div.onClickEvent(() => {
-                  activeWindow.open(`file://${encodeURI(link)}`, '_blank');
+                  activeWindow.open(link.url, '_blank');
                 });
               });
             });

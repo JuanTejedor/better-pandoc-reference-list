@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Minimal style that, like Chicago author-date, leaves interviews out of the bibliography. -->
+<style xmlns="http://purl.org/net/xbiblio/csl" class="in-text" version="1.0" default-locale="en-US">
+  <info>
+    <title>Suppress interviews (test)</title>
+    <id>http://example.com/styles/suppress-interviews-test</id>
+    <updated>2020-01-01T00:00:00+00:00</updated>
+  </info>
+  <citation>
+    <layout prefix="(" suffix=")" delimiter="; ">
+      <text variable="title"/>
+    </layout>
+  </citation>
+  <bibliography>
+    <sort>
+      <key variable="title"/>
+    </sort>
+    <layout>
+      <choose>
+        <if type="interview"/>
+        <else>
+          <text variable="title"/>
+        </else>
+      </choose>
+    </layout>
+  </bibliography>
+</style>

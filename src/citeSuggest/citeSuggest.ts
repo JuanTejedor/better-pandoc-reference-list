@@ -22,7 +22,6 @@ export class CiteSuggest extends EditorSuggest<
   Fuse.FuseResult<PartialCSLEntry> | Loading
 > {
   private plugin: ReferenceList;
-  private app: App;
 
   limit: number = 20;
 
@@ -169,12 +168,23 @@ export class CiteSuggest extends EditorSuggest<
     this.close();
   }
 
-  isRefreshing: boolean = false;
+  /**
+   * Suggestions are the moment new references matter most, so check Zotero
+   * for changes whenever the popup opens. This costs one small request when
+   * nothing changed, and concurrent calls are coalesced.
+   */
   async refreshZBib() {
-    if (this.isRefreshing) return;
-    this.isRefreshing = true;
-    await this.plugin.bibManager.refreshGlobalZBib();
-    this.isRefreshing = false;
+    const changed = await this.plugin.bibManager.refreshGlobalZBib({
+      minIntervalMs: 2000,
+    });
+    if (changed && this.context) {
+      try {
+        const suggestions = this.getSuggestions(this.context) || [];
+        (this as any).suggestions?.setSuggestions(suggestions);
+      } catch (e) {
+        console.error('Error updating citation suggestions', e);
+      }
+    }
   }
 
   onTrigger(cursor: EditorPosition, editor: Editor): EditorSuggestTriggerInfo {

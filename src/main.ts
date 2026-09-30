@@ -2,6 +2,7 @@ import {
   Events,
   MarkdownView,
   Menu,
+  Notice,
   Plugin,
   WorkspaceLeaf,
   debounce,
@@ -27,8 +28,8 @@ import { ReferenceListView, viewType } from './view';
 import { PromiseCapability, fixPath, getVaultRoot } from './helpers';
 import path from 'path';
 import { BibManager } from './bib/bibManager';
+import { setApp } from './obsidianApp';
 import { CiteSuggest } from './citeSuggest/citeSuggest';
-import { isZoteroRunning } from './bib/helpers';
 
 export default class ReferenceList extends Plugin {
   settings: ReferenceListSettings;
@@ -46,6 +47,7 @@ export default class ReferenceList extends Plugin {
   }
 
   async onload() {
+    setApp(this.app);
     const { app } = this;
 
     await this.loadSettings();
@@ -103,6 +105,27 @@ export default class ReferenceList extends Plugin {
         this.initLeaf();
       },
     });
+
+    this.addCommand({
+      id: 'refresh-bibliography',
+      name: t('Refresh bibliography'),
+      callback: () => this.refreshBibliography(),
+    });
+
+    this.addCommand({
+      id: 'rebuild-zotero-cache',
+      name: t('Rebuild Zotero cache'),
+      callback: () => this.refreshBibliography({ rebuild: true }),
+    });
+
+    // Switching back from Zotero is exactly when new references matter. The
+    // check is one small request when nothing changed, and is throttled.
+    this.registerDomEvent(window, 'focus', () => {
+      if (!this.settings.pullFromZotero || !this.bibManager) return;
+      this.bibManager.refreshGlobalZBib({ minIntervalMs: 5000 });
+    });
+
+    this.bibManager.zsync.onStatus = () => this.updateZoteroStatus();
 
     document.body.toggleClass(
       'pwc-tooltips',
@@ -166,9 +189,6 @@ export default class ReferenceList extends Plugin {
 
   onunload() {
     document.body.removeClass('pwc-tooltips');
-    this.app.workspace
-      .getLeavesOfType(viewType)
-      .forEach((leaf) => leaf.detach());
     this.bibManager.destroy();
   }
 
@@ -213,26 +233,7 @@ export default class ReferenceList extends Plugin {
             .setSection('actions')
             .setIcon('lucide-rotate-cw')
             .setTitle(t('Refresh bibliography'))
-            .onClick(async () => {
-              const activeView =
-                this.app.workspace.getActiveViewOfType(MarkdownView);
-              if (activeView) {
-                const file = activeView.file;
-
-                if (this.bibManager.fileCache.has(file)) {
-                  const cache = this.bibManager.fileCache.get(file);
-                  if (cache.source !== this.bibManager) {
-                    this.bibManager.fileCache.delete(file);
-                    this.processReferences();
-                    return;
-                  }
-                }
-              }
-
-              this.bibManager.reinit(true);
-              await this.bibManager.initPromise.promise;
-              this.processReferences();
-            })
+            .onClick(() => this.refreshBibliography())
         );
 
       const rect = ico.getBoundingClientRect();
@@ -250,6 +251,63 @@ export default class ReferenceList extends Plugin {
     });
   }
 
+  /**
+   * Re-reads the bibliography (Zotero or file). Unlike the old implementation,
+   * a failed refresh keeps the existing entries instead of emptying them.
+   */
+  async refreshBibliography(opts: { rebuild?: boolean } = {}) {
+    const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
+    if (activeView) {
+      const file = activeView.file;
+      if (this.bibManager.fileCache.has(file)) {
+        const cache = this.bibManager.fileCache.get(file);
+        if (cache.source !== this.bibManager) {
+          // The note uses its own bibliography file
+          this.bibManager.fileCache.delete(file);
+          this.processReferences();
+          return;
+        }
+      }
+    }
+
+    if (this.settings.pullFromZotero) {
+      const zsync = this.bibManager.zsync;
+      const changed = await this.bibManager.refreshGlobalZBib({
+        force: true,
+        rebuild: opts.rebuild,
+      });
+      if (zsync.status === 'offline') {
+        new Notice(t('Cannot connect to Zotero'));
+      } else if (zsync.status === 'error') {
+        new Notice(`Zotero: ${zsync.lastError}`, 10000);
+      } else {
+        new Notice(
+          changed ? t('Bibliography updated') : t('Bibliography is up to date')
+        );
+      }
+      this.processReferences();
+      return;
+    }
+
+    this.bibManager.reinit(true);
+    await this.bibManager.initPromise.promise;
+    this.processReferences();
+  }
+
+  updateZoteroStatus() {
+    const ico = this.statusBarIcon;
+    if (!ico) return;
+    const { status, lastError } = this.bibManager.zsync;
+    const problem = status === 'offline' || status === 'error';
+    ico.toggleClass('pwc-status-warn', problem);
+    ico.setAttr(
+      'aria-label',
+      problem
+        ? `${t('Pandoc reference list settings')} — Zotero: ${lastError}`
+        : t('Pandoc reference list settings')
+    );
+  }
+
   setStatusBarLoading() {
     this.statusBarIcon.addClass('is-loading');
     setIcon(this.statusBarIcon, 'lucide-loader');
@@ -260,14 +318,26 @@ export default class ReferenceList extends Plugin {
     setIcon(this.statusBarIcon, 'lucide-at-sign');
   }
 
-  get view() {
-    const leaves = this.app.workspace.getLeavesOfType(viewType);
-    if (!leaves?.length) return null;
-    return leaves[0].view as ReferenceListView;
+  /**
+   * The live reference list view, if there is one. Since Obsidian 1.7 a leaf
+   * restored at start-up holds a placeholder (DeferredView) until it is first
+   * shown, so `leaf.view` is not necessarily ours: calling setViewContent on
+   * it threw "setViewContent is not a function" (#127, #162).
+   */
+  get view(): ReferenceListView | null {
+    const leaf = this.app.workspace
+      .getLeavesOfType(viewType)
+      .find((l) => l.view instanceof ReferenceListView);
+    return leaf ? (leaf.view as ReferenceListView) : null;
   }
 
   async initLeaf() {
-    if (this.view) return this.revealLeaf();
+    const existing = this.app.workspace.getLeavesOfType(viewType);
+    if (existing.length) {
+      // Load a deferred leaf instead of opening a second pane
+      await existing[0].loadIfDeferred();
+      return this.revealLeaf();
+    }
 
     await this.app.workspace.getRightLeaf(false).setViewState({
       type: viewType,
@@ -342,14 +412,19 @@ export default class ReferenceList extends Plugin {
         );
         const cache = this.bibManager.fileCache.get(activeView.file);
 
+        const zstatus = this.bibManager.zsync.status;
         if (
           !bib &&
           cache?.source === this.bibManager &&
           settings.pullFromZotero &&
-          !(await isZoteroRunning(settings.zoteroPort)) &&
-          this.bibManager.fileCache.get(activeView.file)?.keys.size
+          (zstatus === 'offline' || zstatus === 'error') &&
+          cache?.keys.size
         ) {
-          view?.setMessage(t('Cannot connect to Zotero'));
+          view?.setMessage(
+            zstatus === 'offline'
+              ? t('Cannot connect to Zotero')
+              : `Zotero: ${this.bibManager.zsync.lastError}`
+          );
         } else {
           view?.setViewContent(bib);
         }

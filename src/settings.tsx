@@ -16,6 +16,10 @@ import {
 import { cslListRaw } from './bib/cslList';
 import { langListRaw } from './bib/cslLangList';
 import { ZoteroPullSetting } from './settings/ZoteroPullSetting';
+import { ZoteroSource } from './zotero/types';
+
+export const GUIDE_URL =
+  'https://github.com/JuanTejedor/better-pandoc-reference-list#how-it-works';
 
 export const DEFAULT_SETTINGS: ReferenceListSettings = {
   pathToPandoc: '',
@@ -29,6 +33,7 @@ export const DEFAULT_SETTINGS: ReferenceListSettings = {
 export interface ZoteroGroup {
   id: number;
   name: string;
+  /** Unused since v3: sync state now lives in the library cache. Kept so old settings still load. */
   lastUpdate?: number;
 }
 
@@ -50,6 +55,8 @@ export interface ReferenceListSettings {
 
   pullFromZotero?: boolean;
   zoteroPort?: string;
+  /** 'auto' prefers Zotero's local API and falls back to Better BibTeX. */
+  zoteroSource?: ZoteroSource;
   zoteroGroups: ZoteroGroup[];
 }
 
@@ -57,7 +64,7 @@ export class ReferenceListSettingsTab extends PluginSettingTab {
   plugin: ReferenceList;
 
   constructor(plugin: ReferenceList) {
-    super(app, plugin);
+    super(plugin.app, plugin);
     this.plugin = plugin;
   }
 
@@ -65,6 +72,19 @@ export class ReferenceListSettingsTab extends PluginSettingTab {
     const { containerEl } = this;
 
     containerEl.empty();
+
+    new Setting(containerEl)
+      .setName(t('How this plugin works'))
+      .setDesc(
+        t(
+          'A short guide: where references come from, how they stay up to date, and troubleshooting.'
+        )
+      )
+      .addButton((btn) =>
+        btn.setButtonText(t('Open the guide')).onClick(() => {
+          window.open(GUIDE_URL, '_blank');
+        })
+      );
 
     new Setting(containerEl)
       .setName(t('Fallback path to Pandoc'))

@@ -622,6 +622,9 @@ export function getCitationSegments(str: string, ignoreLinks: boolean = false) {
       if (c === ';') {
         state.shouldCancelSeek = false;
         endCurrent(i);
+        // A new citation starts after ';', so we are no longer inside a key
+        // (otherwise its prefix is misread as a suffix of the previous one).
+        state.inKey = false;
         state.currentSegment = newCurrent(i, c, SegmentType.separator);
         continue;
       }

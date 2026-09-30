@@ -1,5 +1,6 @@
 import { FileSystemAdapter, htmlToMarkdown } from 'obsidian';
 import { shellPath } from 'shell-path';
+import { app } from 'src/obsidianApp';
 
 export function getVaultRoot() {
   // This is a desktop only plugin, so assume adapter is FileSystemAdapter
