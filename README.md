@@ -67,13 +67,13 @@ Each device builds its own cache. You can delete it safely; the plugin will impo
 
 - If Zotero is closed or cannot be reached, the plugin keeps using its cache and tries again in the background. The `@` icon in the status bar (bottom right of Obsidian) turns to a warning colour; hover over it to see why.
 - A failed update never empties your bibliography.
-- The plugin never edits your notes by itself.
 
 ## Commands
 
 Open the command palette (`Ctrl/Cmd + P`):
 
 - "Show reference list": opens the sidebar with the references of the current note.
+- "Insert references": inserts the reference list of the current note at the cursor, under a heading. The same action is the second button at the top of the sidebar, next to the copy button. You can choose the heading level and text in the plugin settings.
 - "Refresh bibliography": checks Zotero (or re-reads the bibliography file) right now. The same action is in the `@` status bar menu.
 - "Rebuild Zotero cache": deletes the cache and imports the whole library again. Use it if something looks wrong.
 

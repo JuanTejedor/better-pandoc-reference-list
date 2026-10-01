@@ -71,6 +71,18 @@ export default {
   'No citations found in the current document.':
     'No citations found in the current document.',
   References: 'References',
+  'Insert references': 'Insert references',
+  'Insert references at the cursor': 'Insert references at the cursor',
+  'Heading level for inserted references':
+    'Heading level for inserted references',
+  'The heading used when you insert the reference list into a note.':
+    'The heading used when you insert the reference list into a note.',
+  'Heading text for inserted references':
+    'Heading text for inserted references',
+  'Leave empty to use "References".': 'Leave empty to use "References".',
+  'Open a note in editing mode to insert the references.':
+    'Open a note in editing mode to insert the references.',
+  'There are no references to insert.': 'There are no references to insert.',
   'This can be overridden on a per-file basis by setting "lang" or "citation-language" in the file\'s frontmatter. A language code must be used when setting the language via frontmatter.':
     'This can be overridden on a per-file basis by setting "lang" or "citation-language" in the file\'s frontmatter. A language code must be used when setting the language via frontmatter.',
   'See here for a list of available language codes':

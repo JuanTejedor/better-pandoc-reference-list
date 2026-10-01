@@ -18,6 +18,7 @@ import { langListRaw } from './bib/cslLangList';
 import { ZoteroPullSetting } from './settings/ZoteroPullSetting';
 import { ZoteroSource } from './zotero/types';
 import { pickFile } from './helpers';
+import { DEFAULT_HEADING_LEVEL, clampHeadingLevel } from './referencesBlock';
 
 interface SelectOption {
   value: string;
@@ -34,6 +35,7 @@ export const DEFAULT_SETTINGS: ReferenceListSettings = {
   renderCitations: true,
   renderCitationsReadingMode: true,
   renderLinkCitations: true,
+  referencesHeadingLevel: DEFAULT_HEADING_LEVEL,
 };
 
 export interface ZoteroGroup {
@@ -58,6 +60,10 @@ export interface ReferenceListSettings {
   renderCitations?: boolean;
   renderCitationsReadingMode?: boolean;
   renderLinkCitations?: boolean;
+
+  /** Heading level (1-6) and text used by "Insert references". */
+  referencesHeadingLevel?: number;
+  referencesHeadingText?: string;
 
   pullFromZotero?: boolean;
   zoteroPort?: string;
@@ -394,6 +400,42 @@ export class ReferenceListSettingsTab extends PluginSettingTab {
           .setValue(this.plugin.settings.tooltipDelay)
           .onChange((value) => {
             this.plugin.settings.tooltipDelay = value;
+            void this.plugin.saveSettings();
+          });
+      });
+
+    new Setting(containerEl)
+      .setName(t('Heading level for inserted references'))
+      .setDesc(
+        t(
+          'The heading used when you insert the reference list into a note.'
+        )
+      )
+      .addDropdown((dropdown) => {
+        const levels: Record<string, string> = {};
+        for (let i = 1; i <= 6; i++) levels[String(i)] = `${'#'.repeat(i)} (${i})`;
+        dropdown
+          .addOptions(levels)
+          .setValue(
+            String(clampHeadingLevel(this.plugin.settings.referencesHeadingLevel))
+          )
+          .onChange((value) => {
+            this.plugin.settings.referencesHeadingLevel = clampHeadingLevel(
+              Number(value)
+            );
+            void this.plugin.saveSettings();
+          });
+      });
+
+    new Setting(containerEl)
+      .setName(t('Heading text for inserted references'))
+      .setDesc(t('Leave empty to use "References".'))
+      .addText((text) => {
+        text
+          .setPlaceholder(t('References'))
+          .setValue(this.plugin.settings.referencesHeadingText ?? '')
+          .onChange((value) => {
+            this.plugin.settings.referencesHeadingText = value;
             void this.plugin.saveSettings();
           });
       });

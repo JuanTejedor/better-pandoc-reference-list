@@ -63,6 +63,18 @@ export class ReferenceListView extends ItemView {
                 btn.onClickEvent(() => copyElToClipboard(bib));
               }
             );
+            div.createDiv(
+              {
+                cls: 'clickable-icon',
+                attr: {
+                  'aria-label': t('Insert references at the cursor'),
+                },
+              },
+              (btn) => {
+                setIcon(btn, 'lucide-text-cursor-input');
+                btn.onClickEvent(() => this.plugin.insertReferences(bib));
+              }
+            );
           });
         }
       );

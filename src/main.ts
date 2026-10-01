@@ -6,6 +6,7 @@ import {
   Plugin,
   WorkspaceLeaf,
   debounce,
+  htmlToMarkdown,
   setIcon,
 } from 'obsidian';
 import which from 'which';
@@ -30,6 +31,7 @@ import { fixPath } from './shellPath';
 import * as path from 'path';
 import { BibManager } from './bib/bibManager';
 import { setApp } from './obsidianApp';
+import { buildReferencesBlock, placeBlock } from './referencesBlock';
 import { asSectionedMenu } from './obsidianInternals';
 import { CiteSuggest } from './citeSuggest/citeSuggest';
 
@@ -107,6 +109,24 @@ export default class ReferenceList extends Plugin {
         void this.initLeaf();
       },
     });
+
+    this.addCommand({
+      id: 'insert-references',
+      name: t('Insert references'),
+      callback: () => {
+        const file = this.app.workspace.getActiveViewOfType(MarkdownView)?.file;
+        const bib = file ? this.bibManager.fileCache.get(file)?.bib : null;
+        this.insertReferences(bib ?? null);
+      },
+    });
+
+    // The sidebar steals focus when its button is clicked, so remember the
+    // last note the user was editing
+    this.registerEvent(
+      this.app.workspace.on('active-leaf-change', (leaf) => {
+        if (leaf?.view instanceof MarkdownView) this.lastMarkdownView = leaf.view;
+      })
+    );
 
     this.addCommand({
       id: 'refresh-bibliography',
@@ -192,6 +212,43 @@ export default class ReferenceList extends Plugin {
   onunload() {
     document.body.removeClass('pwc-tooltips');
     this.bibManager.destroy();
+  }
+
+  lastMarkdownView: MarkdownView | null = null;
+
+  /** Inserts the reference list, as Markdown under a heading, at the cursor. */
+  insertReferences(bib: HTMLElement | null) {
+    const entries = bib?.findAll('.csl-entry') ?? [];
+    if (!entries.length) {
+      new Notice(t('There are no references to insert.'));
+      return;
+    }
+
+    const open = this.app.workspace.getLeavesOfType('markdown');
+    const remembered = this.lastMarkdownView;
+    const view =
+      remembered && open.some((l) => l.view === remembered)
+        ? remembered
+        : this.app.workspace.getActiveViewOfType(MarkdownView);
+
+    if (!view || view.getMode() !== 'source') {
+      new Notice(t('Open a note in editing mode to insert the references.'));
+      return;
+    }
+
+    const block = buildReferencesBlock(
+      this.settings.referencesHeadingLevel,
+      this.settings.referencesHeadingText?.trim() || t('References'),
+      entries.map((entry) => htmlToMarkdown(entry))
+    );
+
+    const editor = view.editor;
+    const cursor = editor.getCursor();
+    const line = editor.getLine(cursor.line);
+    editor.replaceRange(
+      placeBlock(block, line.slice(0, cursor.ch), line.slice(cursor.ch)),
+      cursor
+    );
   }
 
   statusBarIcon: HTMLElement;
