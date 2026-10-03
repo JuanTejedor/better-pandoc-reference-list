@@ -222,7 +222,10 @@ const segmentFixtures: Record<string, Segment[][]> = {
           type: SegmentType.key,
         },
         { from: 68, to: 69, val: '}', type: SegmentType.curlyBracket },
-        { from: 69, to: 76, val: ', p. 33', type: SegmentType.suffix },
+        { from: 69, to: 71, val: ', ', type: SegmentType.locatorSuffix },
+        { from: 71, to: 73, val: 'p.', type: SegmentType.locatorLabel },
+        { from: 73, to: 74, val: ' ', type: SegmentType.locatorSuffix },
+        { from: 74, to: 76, val: '33', type: SegmentType.locator },
         { from: 76, to: 77, val: ']', type: SegmentType.bracket },
       ],
     ],
@@ -301,6 +304,116 @@ const segmentFixtures: Record<string, Segment[][]> = {
       },
       { from: 34, to: 47, val: ', with suffix', type: SegmentType.suffix },
       { from: 47, to: 48, val: ']', type: SegmentType.bracket },
+    ],
+  ],
+  // Pandoc assumes 'page' when no locator term is given, and a comma may
+  // separate the key from the locator.
+  '@item1 [30] says blah.': [
+    [
+      { from: 0, to: 1, val: '@', type: SegmentType.at },
+      { from: 1, to: 6, val: 'item1', type: SegmentType.key },
+      { from: 7, to: 8, val: '[', type: SegmentType.bracket },
+      { from: 8, to: 10, val: '30', type: SegmentType.locator },
+      { from: 10, to: 11, val: ']', type: SegmentType.bracket },
+    ],
+  ],
+  '@item1 [, 30]': [
+    [
+      { from: 0, to: 1, val: '@', type: SegmentType.at },
+      { from: 1, to: 6, val: 'item1', type: SegmentType.key },
+      { from: 7, to: 8, val: '[', type: SegmentType.bracket },
+      { from: 8, to: 10, val: ', ', type: SegmentType.locatorSuffix },
+      { from: 10, to: 12, val: '30', type: SegmentType.locator },
+      { from: 12, to: 13, val: ']', type: SegmentType.bracket },
+    ],
+  ],
+  '[@item1, 30]': [
+    [
+      { from: 0, to: 1, val: '[', type: SegmentType.bracket },
+      { from: 1, to: 2, val: '@', type: SegmentType.at },
+      { from: 2, to: 7, val: 'item1', type: SegmentType.key },
+      { from: 7, to: 9, val: ', ', type: SegmentType.locatorSuffix },
+      { from: 9, to: 11, val: '30', type: SegmentType.locator },
+      { from: 11, to: 12, val: ']', type: SegmentType.bracket },
+    ],
+  ],
+  '[@item1, p. 30]': [
+    [
+      { from: 0, to: 1, val: '[', type: SegmentType.bracket },
+      { from: 1, to: 2, val: '@', type: SegmentType.at },
+      { from: 2, to: 7, val: 'item1', type: SegmentType.key },
+      { from: 7, to: 9, val: ', ', type: SegmentType.locatorSuffix },
+      { from: 9, to: 11, val: 'p.', type: SegmentType.locatorLabel },
+      { from: 11, to: 12, val: ' ', type: SegmentType.locatorSuffix },
+      { from: 12, to: 14, val: '30', type: SegmentType.locator },
+      { from: 14, to: 15, val: ']', type: SegmentType.bracket },
+    ],
+  ],
+  '@item1 [851–59, emphasis added]': [
+    [
+      { from: 0, to: 1, val: '@', type: SegmentType.at },
+      { from: 1, to: 6, val: 'item1', type: SegmentType.key },
+      { from: 7, to: 8, val: '[', type: SegmentType.bracket },
+      { from: 8, to: 14, val: '851–59', type: SegmentType.locator },
+      { from: 14, to: 30, val: ', emphasis added', type: SegmentType.suffix },
+      { from: 30, to: 31, val: ']', type: SegmentType.bracket },
+    ],
+  ],
+  '@item1 [pp. 851–59]': [
+    [
+      { from: 0, to: 1, val: '@', type: SegmentType.at },
+      { from: 1, to: 6, val: 'item1', type: SegmentType.key },
+      { from: 7, to: 8, val: '[', type: SegmentType.bracket },
+      { from: 8, to: 11, val: 'pp.', type: SegmentType.locatorLabel },
+      { from: 11, to: 12, val: ' ', type: SegmentType.locatorSuffix },
+      { from: 12, to: 18, val: '851–59', type: SegmentType.locator },
+      { from: 18, to: 19, val: ']', type: SegmentType.bracket },
+    ],
+  ],
+  // Without a term, every locator word needs a digit.
+  '@item1 [xii]': [
+    [
+      { from: 0, to: 1, val: '@', type: SegmentType.at },
+      { from: 1, to: 6, val: 'item1', type: SegmentType.key },
+      { from: 7, to: 8, val: '[', type: SegmentType.bracket },
+      { from: 8, to: 11, val: 'xii', type: SegmentType.suffix },
+      { from: 11, to: 12, val: ']', type: SegmentType.bracket },
+    ],
+  ],
+  '[@item1, 12, middle]': [
+    [
+      { from: 0, to: 1, val: '[', type: SegmentType.bracket },
+      { from: 1, to: 2, val: '@', type: SegmentType.at },
+      { from: 2, to: 7, val: 'item1', type: SegmentType.key },
+      { from: 7, to: 9, val: ', ', type: SegmentType.locatorSuffix },
+      { from: 9, to: 11, val: '12', type: SegmentType.locator },
+      { from: 11, to: 19, val: ', middle', type: SegmentType.suffix },
+      { from: 19, to: 20, val: ']', type: SegmentType.bracket },
+    ],
+  ],
+  // Whatever follows a braced locator is suffix.
+  '@item1 [{ii}, 99 years later]': [
+    [
+      { from: 0, to: 1, val: '@', type: SegmentType.at },
+      { from: 1, to: 6, val: 'item1', type: SegmentType.key },
+      { from: 7, to: 8, val: '[', type: SegmentType.bracket },
+      { from: 8, to: 9, val: '{', type: SegmentType.curlyBracket },
+      { from: 9, to: 11, val: 'ii', type: SegmentType.locator },
+      { from: 11, to: 12, val: '}', type: SegmentType.curlyBracket },
+      { from: 12, to: 28, val: ', 99 years later', type: SegmentType.suffix },
+      { from: 28, to: 29, val: ']', type: SegmentType.bracket },
+    ],
+  ],
+  '[@smith{ii}, 99 years later]': [
+    [
+      { from: 0, to: 1, val: '[', type: SegmentType.bracket },
+      { from: 1, to: 2, val: '@', type: SegmentType.at },
+      { from: 2, to: 7, val: 'smith', type: SegmentType.key },
+      { from: 7, to: 8, val: '{', type: SegmentType.curlyBracket },
+      { from: 8, to: 10, val: 'ii', type: SegmentType.locator },
+      { from: 10, to: 11, val: '}', type: SegmentType.curlyBracket },
+      { from: 11, to: 27, val: ', 99 years later', type: SegmentType.suffix },
+      { from: 27, to: 28, val: ']', type: SegmentType.bracket },
     ],
   ],
   '@item1 [{ii, A, D-Z}, with a suffix]': [
@@ -484,6 +597,57 @@ const citationFixtures: Record<string, CitationGroup> = {
     ],
     from: 26,
     to: 52,
+  },
+  '@item1 [30] says blah.': {
+    data: segmentFixtures['@item1 [30] says blah.'][0],
+    citations: [
+      {
+        id: 'item1',
+        composite: true,
+        locator: '30',
+      },
+    ],
+    from: 0,
+    to: 11,
+  },
+  '[@item1, p. 30]': {
+    data: segmentFixtures['[@item1, p. 30]'][0],
+    citations: [
+      {
+        id: 'item1',
+        label: 'page',
+        locator: '30',
+      },
+    ],
+    from: 0,
+    to: 15,
+  },
+  // Pandoc sets off a suffix with no locator with a comma, unless it starts
+  // with a space or punctuation.
+  '@item1 [xii]': {
+    data: segmentFixtures['@item1 [xii]'][0],
+    citations: [
+      {
+        id: 'item1',
+        composite: true,
+        suffix: ', xii',
+      },
+    ],
+    from: 0,
+    to: 12,
+  },
+  'Citation with suffix only [@item1 and nowhere else].': {
+    data: segmentFixtures[
+      'Citation with suffix only [@item1 and nowhere else].'
+    ][0],
+    citations: [
+      {
+        id: 'item1',
+        suffix: 'and nowhere else',
+      },
+    ],
+    from: 26,
+    to: 51,
   },
 };
 
@@ -671,6 +835,21 @@ const citeprocFixtures: Record<string, string[]> = {
   ],
   '[@schureetal2008; @brownetal2013; @lemberger-trueloveetal2018]': [
     '(Brown et al., 2013; Lemberger-Truelove et al., 2018; Schure et al., 2008)',
+  ],
+  '@iversetal2021 [30] says blah': ['Ivers et al. (2021, p. 30)'],
+  '@iversetal2021 [, 30] says blah': ['Ivers et al. (2021, p. 30)'],
+  '[@iversetal2021, 30]': ['(Ivers et al., 2021, p. 30)'],
+  '[@iversetal2021, p. 30]': ['(Ivers et al., 2021, p. 30)'],
+  '[see @iversetal2021, 30; @kabat-zinn2003, 12]': [
+    '(see Ivers et al., 2021, p. 30; Kabat-Zinn, 2003, p. 12)',
+  ],
+  // An en dash range is formatted like a hyphenated one.
+  '@iversetal2021 [851–59]': ['Ivers et al. (2021, pp. 851–859)'],
+  '@iversetal2021 [emphasis added] says blah': [
+    'Ivers et al. (2021, emphasis added)',
+  ],
+  '[@iversetal2021 and nowhere else]': [
+    '(Ivers et al., 2021 and nowhere else)',
   ],
 };
 
