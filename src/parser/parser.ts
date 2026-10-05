@@ -63,7 +63,13 @@ const nonKeyPunct = /\p{P}/u;
 const space = /[ \t\v]/;
 const preKey = /[ \t\v[\-\r\n;]/;
 const locatorRe =
-  /^((?:[[(]?[a-z\p{N}]+[\])]?[-—:][[(]?[a-z\p{N}]+[\])]?|[a-z\p{N}()[\]]*\p{N}+[a-z\p{N}()[\]]*|[mdclxvi]+)(?:[ \t]*,[ \t]*(?:[[(]?[a-z\p{N}]+[\])]?[-—:][[(]?[a-z\p{N}]+[\])]?|[a-z\p{N}()[\]]*\p{N}+[a-z\p{N}()[\]]*|[mdclxvi]+))*)/iu;
+  /^((?:[[(]?[a-z\p{N}]+[\])]?[-–—:][[(]?[a-z\p{N}]+[\])]?|[a-z\p{N}()[\]]*\p{N}+[a-z\p{N}()[\]]*|[mdclxvi]+)(?:[ \t]*,[ \t]*(?:[[(]?[a-z\p{N}]+[\])]?[-–—:][[(]?[a-z\p{N}]+[\])]?|[a-z\p{N}()[\]]*\p{N}+[a-z\p{N}()[\]]*|[mdclxvi]+))*)/iu;
+// Pandoc assumes 'page' when a locator has no term, but then every word of
+// it must contain a digit: `@doe99 [33–5, 40]`.
+const implicitLocatorRe =
+  /^((?:[[(]?[a-z\p{N}]*\p{N}[a-z\p{N}]*[\])]?(?:[-–—:][[(]?[a-z\p{N}]+[\])]?)?)(?:[ \t]*,[ \t]*[[(]?[a-z\p{N}]*\p{N}[a-z\p{N}]*[\])]?(?:[-–—:][[(]?[a-z\p{N}]+[\])]?)?)*)(?![\p{L}\p{N}])/iu;
+// Pandoc lets a comma separate the key from the locator: `[@doe99, 33]`.
+const locatorSep = /^[ \t]*(?:,[ \t]*)?/;
 
 function isTerminus(s?: string) {
   return !s || s === '\r' || s === '\n';
@@ -118,69 +124,30 @@ export function getSegmentData(segments: Segment[]) {
 }
 
 const parsePossibleLocator = (state: State) => {
-  const match = state.currentSegment.val.match(locators);
   const segments: Segment[] = [];
+  let index = state.currentSegment.from;
+  const push = (val: string, type: SegmentType) => {
+    if (!val) return;
+    segments.push({ from: index, to: index + val.length, val, type });
+    index = index + val.length;
+  };
+
+  const sep = state.currentSegment.val.match(locatorSep)[0];
+  let rest = state.currentSegment.val.slice(sep.length);
+  push(sep, SegmentType.locatorSuffix);
+
+  const match = rest.match(locators);
   if (match) {
-    const sp0 = match[1];
-    const label = match[2];
-    const sp1 = match[3];
-    let index = state.currentSegment.from;
-
-    if (sp0) {
-      segments.push({
-        from: index,
-        to: index + sp0.length,
-        val: sp0,
-        type: SegmentType.locatorSuffix,
-      });
-      index = index + sp0.length;
-    }
-
-    segments.push({
-      from: index,
-      to: index + label.length,
-      val: label,
-      type: SegmentType.locatorLabel,
-    });
-    index = index + label.length;
-
-    if (sp1) {
-      segments.push({
-        from: index,
-        to: index + sp1.length,
-        val: sp1,
-        type: SegmentType.locatorSuffix,
-      });
-      index = index + sp1.length;
-    }
-
-    const sliced = state.currentSegment.val.slice(
-      match.index + match[0].length
-    );
-    const locMatch = sliced.match(locatorRe);
-    if (locMatch) {
-      const loc = locMatch[1];
-      segments.push({
-        from: index,
-        to: index + loc.length,
-        val: loc,
-        type: SegmentType.locator,
-      });
-      index = index + loc.length;
-
-      const suffix = sliced.slice(locMatch.index + locMatch[0].length);
-      if (suffix) {
-        segments.push({
-          from: index,
-          to: index + suffix.length,
-          val: suffix,
-          type: SegmentType.suffix,
-        });
-      }
-    } else {
-      return [];
-    }
+    push(match[2], SegmentType.locatorLabel);
+    push(match[3], SegmentType.locatorSuffix);
+    rest = rest.slice(match[0].length);
   }
+
+  const locMatch = rest.match(match ? locatorRe : implicitLocatorRe);
+  if (!locMatch) return [];
+
+  push(locMatch[1], SegmentType.locator);
+  push(rest.slice(locMatch[1].length), SegmentType.suffix);
   return segments;
 };
 
@@ -288,7 +255,14 @@ export function getCitations(
     };
 
     if (prefix?.trim()) cite.prefix = prefix.trim();
-    if (suffix?.trim()) cite.suffix = suffix.trim();
+    if (suffix?.trim()) {
+      // Like pandoc, set off a suffix with no locator with a comma unless it
+      // starts with a space or punctuation: `@doe99 [emphasis added]`.
+      cite.suffix =
+        !locator && /^[^\s\p{P}]/u.test(suffix)
+          ? `, ${suffix.trim()}`
+          : suffix.trim();
+    }
     if (infix?.trim()) cite.infix = infix.trim();
     if (locator) cite.locator = locator;
     if (label && locatorToTerm[locale] && locatorToTerm[locale][label]) {
@@ -654,6 +628,10 @@ export function getCitationSegments(str: string, ignoreLinks: boolean = false) {
           state.seekingLocator = false;
         }
         endCurrent(i);
+        // Braces end the search: what follows a braced locator, or empty
+        // braces, is suffix (`[@doe99{}, 99 years later]`).
+        state.seekingLocator = false;
+        if (seekState) seekState.seekingLocator = false;
         state.currentSegment = newCurrent(i, c, SegmentType.curlyBracket);
         continue;
       }

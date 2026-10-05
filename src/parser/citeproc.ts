@@ -58,7 +58,9 @@ export function getCiteprocCites(
 
     const transferProps = (from: Citation, to: Citation) => {
       if (from.label) to.label = from.label;
-      if (from.locator) to.locator = from.locator;
+      // citeproc-js reads an en dash as a range only in the item's page
+      // field, so hand it locator ranges with a hyphen, as pandoc reads them.
+      if (from.locator) to.locator = from.locator.replace(/–/g, '-');
       if (from.prefix) to.prefix = from.prefix;
       if (from.suffix) to.suffix = from.suffix;
     };
