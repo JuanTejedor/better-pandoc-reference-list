@@ -919,3 +919,16 @@ describe('decodeHtml()', () => {
     );
   });
 });
+
+describe('locator matching on pathological input', () => {
+  it('stays fast on a very long alphanumeric word after a citation', () => {
+    // An accented letter makes the bare-locator pattern fail at the very end,
+    // which used to cost time quadratic in the length (21s for 32,000 chars).
+    const accent = String.fromCharCode(233);
+    for (const word of ['1'.repeat(30000), '1a'.repeat(15000)]) {
+      const start = Date.now();
+      getCitationSegments(`@k [${word}${accent}]`);
+      expect(Date.now() - start).toBeLessThan(500);
+    }
+  });
+});

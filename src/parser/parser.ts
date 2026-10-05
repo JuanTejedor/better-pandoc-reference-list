@@ -64,10 +64,13 @@ const space = /[ \t\v]/;
 const preKey = /[ \t\v[\-\r\n;]/;
 const locatorRe =
   /^((?:[[(]?[a-z\p{N}]+[\])]?[-–—:][[(]?[a-z\p{N}]+[\])]?|[a-z\p{N}()[\]]*\p{N}+[a-z\p{N}()[\]]*|[mdclxvi]+)(?:[ \t]*,[ \t]*(?:[[(]?[a-z\p{N}]+[\])]?[-–—:][[(]?[a-z\p{N}]+[\])]?|[a-z\p{N}()[\]]*\p{N}+[a-z\p{N}()[\]]*|[mdclxvi]+))*)/iu;
+// A word with at least one digit is written (?=[a-z\p{N}]*\p{N})[a-z\p{N}]+
+// rather than [a-z\p{N}]*\p{N}[a-z\p{N}]*, which backtracks quadratically on
+// long alphanumeric text.
 // Pandoc assumes 'page' when a locator has no term, but then every word of
 // it must contain a digit: `@doe99 [33–5, 40]`.
 const implicitLocatorRe =
-  /^((?:[[(]?[a-z\p{N}]*\p{N}[a-z\p{N}]*[\])]?(?:[-–—:][[(]?[a-z\p{N}]+[\])]?)?)(?:[ \t]*,[ \t]*[[(]?[a-z\p{N}]*\p{N}[a-z\p{N}]*[\])]?(?:[-–—:][[(]?[a-z\p{N}]+[\])]?)?)*)(?![\p{L}\p{N}])/iu;
+  /^((?:[[(]?(?=[a-z\p{N}]*\p{N})[a-z\p{N}]+[\])]?(?:[-–—:][[(]?[a-z\p{N}]+[\])]?)?)(?:[ \t]*,[ \t]*[[(]?(?=[a-z\p{N}]*\p{N})[a-z\p{N}]+[\])]?(?:[-–—:][[(]?[a-z\p{N}]+[\])]?)?)*)(?![\p{L}\p{N}])/iu;
 // Pandoc lets a comma separate the key from the locator: `[@doe99, 33]`.
 const locatorSep = /^[ \t]*(?:,[ \t]*)?/;
 

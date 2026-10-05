@@ -1,7 +1,7 @@
 {
 	"id": "better-pandoc-reference-list",
 	"name": "Better Pandoc Reference List",
-	"version": "3.1.0",
+	"version": "3.1.1",
 	"minAppVersion": "1.8.7",
 	"description": "A maintained fork of Pandoc Reference List. Shows a formatted reference in the sidebar for each pandoc citekey in the current document.",
 	"author": "Juan Tejedor",
