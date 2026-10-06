@@ -51,13 +51,11 @@ const localeMap: { [k: string]: Partial<typeof en> } = {
   zh: zhCN,
 };
 
-const lang = getLanguage();
-const locale = localeMap[lang || 'en'];
+// Obsidian reports regional variants such as en-GB, so fall back to the base
+// language. Anything still missing uses English, the fallback for every string.
+const lang = getLanguage() || 'en';
+const locale = localeMap[lang] ?? localeMap[lang.split('-')[0]];
 
 export function t(str: keyof typeof en): string {
-  if (!locale) {
-    console.error('Error: locale not found', lang);
-  }
-
   return (locale && locale[str]) || en[str];
 }
