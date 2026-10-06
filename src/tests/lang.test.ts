@@ -49,6 +49,16 @@ describe('t()', () => {
     expect(t(KEY)).toBe('Estilo de citação (BR)');
   });
 
+  it('uses the Ukrainian table for uk', () => {
+    const { t } = loadHelpers('uk', { uk: { [KEY]: 'Стиль цитування' } });
+    expect(t(KEY)).toBe('Стиль цитування');
+  });
+
+  it('uses the Czech table for cs, the code Obsidian reports', () => {
+    const { t } = loadHelpers('cs', { cs: { [KEY]: 'Citační styl' } });
+    expect(t(KEY)).toBe('Citační styl');
+  });
+
   it('uses English for a language with no table, without logging', () => {
     const { t } = loadHelpers('sv');
     expect(t(KEY)).toBe('Citation style');
