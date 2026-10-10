@@ -1,6 +1,6 @@
 import { getLanguage } from 'obsidian';
 import ar from './locale/ar';
-import cz from './locale/cz';
+import cs from './locale/cs';
 import da from './locale/da';
 import de from './locale/de';
 import en from './locale/en';
@@ -20,13 +20,13 @@ import ro from './locale/ro';
 import ru from './locale/ru';
 import sq from './locale/sq';
 import tr from './locale/tr';
-import uk from './locale/tr';
+import uk from './locale/uk';
 import zhCN from './locale/zh-cn';
 import zhTW from './locale/zh-tw';
 
 const localeMap: { [k: string]: Partial<typeof en> } = {
   ar,
-  cz,
+  cs,
   da,
   de,
   en,
@@ -51,13 +51,11 @@ const localeMap: { [k: string]: Partial<typeof en> } = {
   zh: zhCN,
 };
 
-const lang = getLanguage();
-const locale = localeMap[lang || 'en'];
+// Obsidian reports regional variants such as en-GB, so fall back to the base
+// language. Anything still missing uses English, the fallback for every string.
+const lang = getLanguage() || 'en';
+const locale = localeMap[lang] ?? localeMap[lang.split('-')[0]];
 
 export function t(str: keyof typeof en): string {
-  if (!locale) {
-    console.error('Error: locale not found', lang);
-  }
-
   return (locale && locale[str]) || en[str];
 }
