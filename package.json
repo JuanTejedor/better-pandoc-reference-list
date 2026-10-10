@@ -1,6 +1,6 @@
 {
   "name": "better-pandoc-reference-list",
-  "version": "3.1.1",
+  "version": "3.1.2",
   "description": "A maintained fork of Obsidian Pandoc Reference List",
   "main": "main.js",
   "scripts": {
