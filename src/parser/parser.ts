@@ -229,10 +229,19 @@ export interface CitationGroup {
   to: number;
 }
 
+// Pandoc's citation modes: AuthorInText, SuppressAuthor, NormalCitation.
+export type CitationMode =
+  | 'author-in-text'
+  | 'suppress-author'
+  | 'normal-citation';
+
 export interface RenderedCitation extends CitationGroup {
   val: string;
   noteIndex?: number;
   note?: string;
+  mode?: CitationMode;
+  // An author-in-text citation's author-only form; `val` starts with it.
+  author?: string;
 }
 
 export function getCitations(
