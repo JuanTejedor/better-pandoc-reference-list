@@ -30,6 +30,7 @@ import {
   getCitationSegments,
 } from './parser/parser';
 import { BibManager, FileCache } from './bib/bibManager';
+import { DocRange, citationWidgetRange } from './citationWidgetRange';
 import equal from 'fast-deep-equal';
 import { TooltipManager } from './tooltip';
 import { app } from 'src/obsidianApp';
@@ -221,6 +222,7 @@ export const citeKeyPlugin = ViewPlugin.fromClass(
               const center = Math.round((start + end) / 2);
 
               let linkText: string;
+              let linkTextRange: DocRange;
 
               const centerNode = tree.resolveInner(center, 0);
 
@@ -230,6 +232,7 @@ export const citeKeyPlugin = ViewPlugin.fromClass(
                   ?.includes('hmd-internal-link')
               ) {
                 linkText = view.state.sliceDoc(centerNode.from, centerNode.to);
+                linkTextRange = { from: centerNode.from, to: centerNode.to };
               }
 
               if (
@@ -243,9 +246,13 @@ export const citeKeyPlugin = ViewPlugin.fromClass(
                   );
                 })
               ) {
+                const widget = citationWidgetRange(
+                  { from: start, to: end },
+                  linkTextRange
+                );
                 b.add(
-                  start,
-                  end,
+                  widget.from,
+                  widget.to,
                   citeDeco(rendered, obsView?.file.path, linkText)
                 );
                 continue;
