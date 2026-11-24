@@ -3,6 +3,7 @@ import CSL from 'citeproc';
 import { locales, styles } from './styles';
 import {
   CitationGroup,
+  CitationMode,
   Segment,
   SegmentType,
   getCitationSegments,
@@ -853,6 +854,35 @@ const citeprocFixtures: Record<string, string[]> = {
   ],
 };
 
+// Pandoc's citation modes: the author named in the sentence (`@key`), the
+// author left out (`[-@key]`), or neither (`[@key]`). An author-in-text
+// citation also carries its author-only form, which its value starts with.
+const modeFixtures: Record<
+  string,
+  { mode: CitationMode; author: string | undefined }[]
+> = {
+  '@iversetal2021 says blah': [
+    { mode: 'author-in-text', author: 'Ivers et al.' },
+  ],
+  '@iversetal2021 [30] says blah': [
+    { mode: 'author-in-text', author: 'Ivers et al.' },
+  ],
+  '@iversetal2021 [p. 30, with suffix] says blah': [
+    { mode: 'author-in-text', author: 'Ivers et al.' },
+  ],
+  '@iversetal2021 [-@iversetal2021 p. 30, with suffix] says blah': [
+    { mode: 'author-in-text', author: 'Ivers et al.' },
+  ],
+  '@iversetal2021 [p. 30; see also @kabat-zinn2003] says blah': [
+    { mode: 'author-in-text', author: 'Ivers et al.' },
+  ],
+  '[@iversetal2021, 30]': [{ mode: 'normal-citation', author: undefined }],
+  '[see @iversetal2021, 30; @kabat-zinn2003, 12]': [
+    { mode: 'normal-citation', author: undefined },
+  ],
+  '[-@iversetal2021, 30]': [{ mode: 'suppress-author', author: undefined }],
+};
+
 describe('cite', () => {
   const lib = new Map<string, any>();
   const sys = {
@@ -889,6 +919,20 @@ describe('cite', () => {
           segs.map((s) => getCitations(s))
         ).map((c) => c.val)
       ).toEqual(citeprocFixtures[k]);
+    });
+  });
+
+  describe('citation modes', () => {
+    Object.keys(modeFixtures).forEach((k) => {
+      it(k, () => {
+        const segs = getCitationSegments(k);
+        expect(
+          cite(
+            engine,
+            segs.map((s) => getCitations(s))
+          ).map(({ mode, author }) => ({ mode, author }))
+        ).toEqual(modeFixtures[k]);
+      });
     });
   });
 });

@@ -33,6 +33,7 @@ import { BibManager, FileCache } from './bib/bibManager';
 import { DocRange, citationWidgetRange } from './citationWidgetRange';
 import equal from 'fast-deep-equal';
 import { TooltipManager } from './tooltip';
+import { renderCitation } from './renderCitation';
 import { app } from 'src/obsidianApp';
 
 const ignoreListRegEx = /code|math|templater|hashtag/;
@@ -124,15 +125,7 @@ class CiteWidget extends WidgetType {
           });
         }
 
-        if (/</.test(this.cite.val)) {
-          const parsed = new DOMParser().parseFromString(
-            this.cite.val,
-            'text/html'
-          );
-          span.append(...Array.from(parsed.body.childNodes));
-        } else {
-          span.setText(this.cite.val);
-        }
+        renderCitation(span, this.cite);
       }
     );
   }

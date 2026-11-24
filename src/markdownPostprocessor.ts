@@ -3,6 +3,7 @@ import { MarkdownPostProcessorContext } from 'obsidian';
 import ReferenceList from './main';
 import { Segment, SegmentType, getCitationSegments } from './parser/parser';
 import equal from 'fast-deep-equal';
+import { renderCitation } from './renderCitation';
 
 function getCiteClass(isResolved: boolean, isUnresolved: boolean) {
   const cls = ['pandoc-citation'];
@@ -83,15 +84,7 @@ export function processCiteKeys(plugin: ReferenceList) {
           });
 
           if (plugin.settings.renderCitationsReadingMode) {
-            if (/</.test(rendered.val)) {
-              const parsed = new DOMParser().parseFromString(
-                rendered.val,
-                'text/html'
-              );
-              span.append(...Array.from(parsed.body.childNodes));
-            } else {
-              span.setText(rendered.val);
-            }
+            renderCitation(span, rendered);
           } else {
             span.append(node.cloneNode());
           }

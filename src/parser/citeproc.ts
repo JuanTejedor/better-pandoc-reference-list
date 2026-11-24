@@ -1,5 +1,10 @@
 import type { CiteprocEngine } from 'src/bib/citeprocTypes';
-import { Citation, CitationGroup, RenderedCitation } from './parser';
+import {
+  Citation,
+  CitationGroup,
+  CitationMode,
+  RenderedCitation,
+} from './parser';
 
 export type CiteMode = 'suppress-author' | 'composite' | 'author-only';
 export interface CiteProps {
@@ -161,6 +166,16 @@ function sanitize(val: string) {
   return decodeHtml(val.replace(/\[NO_PRINTED_FORM\] */g, ''));
 }
 
+// The mode is the first citation's, as in pandoc: `@doe99 [33; @roe01]`
+// names Doe in the sentence. `@doe99 [-@doe99 33]` is author-in-text too:
+// the parser reads it as an author-only citation and a suppressed one.
+function citationMode(group: CitationGroup): CitationMode {
+  const first = group.citations[0];
+  if (first?.composite || first?.['author-only']) return 'author-in-text';
+  if (first?.['suppress-author']) return 'suppress-author';
+  return 'normal-citation';
+}
+
 export function cite(engine: CiteprocEngine, group: CitationGroup[]) {
   const { output, idToGroup } = getCiteprocCites(group, engine.opt.xclass);
 
@@ -195,6 +210,7 @@ export function cite(engine: CiteprocEngine, group: CitationGroup[]) {
       ...group[gid],
       val: sanitize(str),
       noteIndex,
+      mode: citationMode(group[gid]),
     };
   });
 
@@ -206,6 +222,7 @@ export function cite(engine: CiteprocEngine, group: CitationGroup[]) {
     const cite = cites[k];
     const isNoteStyle = engine.opt.xclass === 'note';
     if (makes[k]) {
+      cite.author = makes[k].val;
       if (isNoteStyle) {
         cite.note = cite.val;
         cite.val = `${makes[k].val}<sup>${cite.noteIndex}</sup>`;
@@ -215,6 +232,16 @@ export function cite(engine: CiteprocEngine, group: CitationGroup[]) {
     } else if (isNoteStyle) {
       cite.note = cite.val;
       cite.val = `<sup>${cite.noteIndex}</sup>`;
+    } else if (cite.mode === 'author-in-text') {
+      // citeproc renders a composite citation as one string; render the
+      // author alone to find where the name ends. Kept only if the citation
+      // starts with it, since a style may print the name differently there.
+      const author = sanitize(
+        engine.makeCitationCluster([
+          { id: cite.citations[0].id, ['author-only']: true },
+        ])
+      );
+      if (author && cite.val.startsWith(author)) cite.author = author;
     }
     out.push(cite);
   });
