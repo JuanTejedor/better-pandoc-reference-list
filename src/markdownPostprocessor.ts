@@ -16,6 +16,22 @@ function onlyValType(segs: Segment[]) {
   return segs.map((s) => ({ type: s.type, val: s.val }));
 }
 
+/**
+ * Obsidian shows `[[@doe99#Intro]]` as "@doe99 > Intro". When a link shows
+ * that default text, returns its target, `@doe99#Intro`.
+ */
+export function linkTargetShownAs(link: HTMLElement, text: string) {
+  const href = link.getAttribute('data-href');
+  if (!href?.includes('#')) return null;
+  return text === href.split('#').join(' > ') ? href : null;
+}
+
+function shiftSegments(segments: Segment[][], by: number) {
+  return segments.map((s) =>
+    s.map((seg) => ({ ...seg, from: seg.from + by, to: seg.to + by }))
+  );
+}
+
 export function processCiteKeys(plugin: ReferenceList) {
   return (el: HTMLElement, ctx: MarkdownPostProcessorContext) => {
     const toRemove: Node[] = [];
@@ -43,16 +59,24 @@ export function processCiteKeys(plugin: ReferenceList) {
       }
 
       let content = node.nodeValue;
+      let segments: Segment[][];
       if (node.parentElement.tagName === 'A') {
         if (!plugin.settings.renderLinkCitations) continue;
-        content = `[${content}]`;
+        const target = linkTargetShownAs(node.parentElement, content);
+        if (target) {
+          // Parse it as the wikilink it came from, so its `#` starts a subpath
+          content = `[${target}]`;
+          segments = shiftSegments(getCitationSegments(`[${content}]`), -1);
+        } else {
+          content = `[${content}]`;
+        }
       }
 
       let frag = createFragment();
       let pos = 0;
       let didMatch = false;
 
-      const segments = getCitationSegments(
+      segments ??= getCitationSegments(
         content,
         !plugin.settings.renderLinkCitations
       );
@@ -152,6 +176,7 @@ export function processCiteKeys(plugin: ReferenceList) {
             case SegmentType.locator:
             case SegmentType.locatorLabel:
             case SegmentType.locatorSuffix:
+            case SegmentType.linkSubpath:
               frag.createSpan({
                 cls: `pandoc-citation-formatting ${part.type}`,
                 text: part.val,

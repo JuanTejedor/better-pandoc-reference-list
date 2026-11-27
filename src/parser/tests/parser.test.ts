@@ -489,6 +489,49 @@ describe('getCitationSegments(ignoreLinks = true)', () => {
     expect(getCitationSegments('[@nonexistent](../hello.md)', true)).toEqual(
       []
     ));
+  it('[[@doe99#^abc123]]', () =>
+    expect(getCitationSegments('[[@doe99#^abc123]]', true)).toEqual([]));
+});
+
+describe('wikilinks to a heading or block of a note', () => {
+  const citationsOf = (str: string) =>
+    getCitationSegments(str).map((s) => getCitations(s).citations);
+
+  it('splits the block reference off the key', () => {
+    expect(getCitationSegments('[[@doe99#^abc123]]')).toEqual([
+      [
+        { from: 1, to: 2, val: '[', type: SegmentType.bracket },
+        { from: 2, to: 3, val: '@', type: SegmentType.at },
+        { from: 3, to: 8, val: 'doe99', type: SegmentType.key },
+        { from: 8, to: 16, val: '#^abc123', type: SegmentType.linkSubpath },
+        { from: 16, to: 17, val: ']', type: SegmentType.bracket },
+      ],
+    ]);
+  });
+
+  it('cites the note of a heading link', () => {
+    expect(citationsOf('[[@doe99#Some heading]]')).toEqual([[{ id: 'doe99' }]]);
+  });
+
+  it('cites the note of a block link with an alias like a plain alias link', () => {
+    const [[block]] = citationsOf('[[@doe99#^abc123|(Doe, 1999, p. 4)]]');
+    const [[plain]] = citationsOf('[[@doe99|(Doe, 1999, p. 4)]]');
+    expect(block).toEqual(plain);
+    expect(block.id).toBe('doe99');
+  });
+
+  it('keeps @ and ; in a heading out of the citation', () => {
+    expect(citationsOf('[[@doe99#See @smith; then more]]')).toEqual([
+      [{ id: 'doe99' }],
+    ]);
+  });
+
+  it('keeps # in keys outside wikilinks, as pandoc does', () => {
+    expect(citationsOf('[@doe#99]')).toEqual([[{ id: 'doe#99' }]]);
+    expect(citationsOf('@doe#99 says')).toEqual([
+      [{ id: 'doe#99', composite: true }],
+    ]);
+  });
 });
 
 const citationFixtures: Record<string, CitationGroup> = {
