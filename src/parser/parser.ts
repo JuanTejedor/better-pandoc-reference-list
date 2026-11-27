@@ -14,6 +14,9 @@ export enum SegmentType {
   locator = 'locator',
   locatorLabel = 'locatorLabel',
   separator = 'separator',
+
+  // The `#Heading` or `#^block-id` of `[[@doe99#^block-id]]`
+  linkSubpath = 'linkSubpath',
 }
 
 export interface Segment {
@@ -29,6 +32,7 @@ interface State {
   inExplicitLocator: boolean;
   inKey: boolean;
   inLink: boolean;
+  inLinkSubpath: boolean;
   inSuffix: boolean;
   seekingSuffix: boolean;
   seekingLocator: boolean;
@@ -48,6 +52,7 @@ function newState(): State {
     inExplicitLocator: false,
     inSuffix: false,
     inLink: false,
+    inLinkSubpath: false,
     seekingSuffix: false,
     seekingLocator: false,
     encounteredKey: false,
@@ -406,7 +411,7 @@ export function getCitationSegments(str: string, ignoreLinks: boolean = false) {
       }
     }
 
-    if (c === '@' && isValidPreKey(prev)) {
+    if (c === '@' && isValidPreKey(prev) && !state?.inLinkSubpath) {
       if (seekState && state.shouldCancelSeek) {
         segments.push(seekState.segment);
         seekState = null;
@@ -493,6 +498,17 @@ export function getCitationSegments(str: string, ignoreLinks: boolean = false) {
         continue;
       }
 
+      // Pandoc allows `#` inside a key, but in a wikilink Obsidian reads it as
+      // the start of a heading or block reference (and forbids `#` in note
+      // names), so `[[@doe99#^abc]]` cites doe99.
+      if (c === '#' && state.inLink && !state.inExplicitKey) {
+        endCurrent(i);
+        state.inKey = false;
+        state.inLinkSubpath = true;
+        state.currentSegment = newCurrent(i, c, SegmentType.linkSubpath);
+        continue;
+      }
+
       if (alphaNumeric.test(c)) {
         state.currentSegment.val += c;
         continue;
@@ -565,6 +581,24 @@ export function getCitationSegments(str: string, ignoreLinks: boolean = false) {
     }
 
     if (state?.inBrackets) {
+      // The subpath runs to the alias (`|`) or the end of the link.
+      if (state.inLinkSubpath) {
+        if (c !== '|' && c !== ']' && !isTerminus(c)) {
+          state.currentSegment.val += c;
+          continue;
+        }
+
+        state.inLinkSubpath = false;
+
+        if (c === '|') {
+          endCurrent(i);
+          state.currentSegment = newCurrent(i, c, SegmentType.suffix);
+          state.inSuffix = true;
+          state.seekingLocator = true;
+          continue;
+        }
+      }
+
       if (isTerminus(c)) {
         state = null;
         continue;

@@ -152,6 +152,7 @@ export function processCiteKeys(plugin: ReferenceList) {
             case SegmentType.locator:
             case SegmentType.locatorLabel:
             case SegmentType.locatorSuffix:
+            case SegmentType.linkSubpath:
               frag.createSpan({
                 cls: `pandoc-citation-formatting ${part.type}`,
                 text: part.val,

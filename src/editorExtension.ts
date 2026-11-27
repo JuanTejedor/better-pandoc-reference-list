@@ -321,6 +321,7 @@ export const citeKeyPlugin = ViewPlugin.fromClass(
               case SegmentType.locator:
               case SegmentType.locatorLabel:
               case SegmentType.locatorSuffix:
+              case SegmentType.linkSubpath:
                 b.add(start, end, citeMarkExtra(part.type));
                 continue;
             }
