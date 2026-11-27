@@ -17,6 +17,8 @@ export enum SegmentType {
 
   // The `#Heading` or `#^block-id` of `[[@doe99#^block-id]]`
   linkSubpath = 'linkSubpath',
+  // The `|Doe` of `[[@doe99|Doe]]`
+  linkAlias = 'linkAlias',
 }
 
 export interface Segment {
@@ -33,6 +35,7 @@ interface State {
   inKey: boolean;
   inLink: boolean;
   inLinkSubpath: boolean;
+  inLinkAlias: boolean;
   inSuffix: boolean;
   seekingSuffix: boolean;
   seekingLocator: boolean;
@@ -53,6 +56,7 @@ function newState(): State {
     inSuffix: false,
     inLink: false,
     inLinkSubpath: false,
+    inLinkAlias: false,
     seekingSuffix: false,
     seekingLocator: false,
     encounteredKey: false,
@@ -411,7 +415,12 @@ export function getCitationSegments(str: string, ignoreLinks: boolean = false) {
       }
     }
 
-    if (c === '@' && isValidPreKey(prev) && !state?.inLinkSubpath) {
+    if (
+      c === '@' &&
+      isValidPreKey(prev) &&
+      !state?.inLinkSubpath &&
+      !state?.inLinkAlias
+    ) {
       if (seekState && state.shouldCancelSeek) {
         segments.push(seekState.segment);
         seekState = null;
@@ -581,22 +590,30 @@ export function getCitationSegments(str: string, ignoreLinks: boolean = false) {
     }
 
     if (state?.inBrackets) {
-      // The subpath runs to the alias (`|`) or the end of the link.
-      if (state.inLinkSubpath) {
-        if (c !== '|' && c !== ']' && !isTerminus(c)) {
+      // The subpath runs to the alias (`|`) or the end of the link, and the
+      // alias to the end of the link.
+      if (state.inLinkSubpath || state.inLinkAlias) {
+        const ends = c === ']' || isTerminus(c) || (state.inLinkSubpath && c === '|');
+        if (!ends) {
           state.currentSegment.val += c;
           continue;
         }
 
         state.inLinkSubpath = false;
+        state.inLinkAlias = false;
+      }
 
-        if (c === '|') {
-          endCurrent(i);
-          state.currentSegment = newCurrent(i, c, SegmentType.suffix);
-          state.inSuffix = true;
-          state.seekingLocator = true;
-          continue;
-        }
+      // `[[@doe99|Doe]]` shows its alias instead of the citation
+      if (
+        c === '|' &&
+        state.inLink &&
+        (state.inKey || state.currentSegment.type === SegmentType.linkSubpath)
+      ) {
+        endCurrent(i);
+        state.inKey = false;
+        state.inLinkAlias = true;
+        state.currentSegment = newCurrent(i, c, SegmentType.linkAlias);
+        continue;
       }
 
       if (isTerminus(c)) {

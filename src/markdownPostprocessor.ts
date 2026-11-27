@@ -26,6 +26,12 @@ export function linkTargetShownAs(link: HTMLElement, text: string) {
   return text === href.split('#').join(' > ') ? href : null;
 }
 
+/** Whether a link to a citation note, `[[@doe99|Doe]]`, shows an alias. */
+export function isCitationLinkAlias(link: HTMLElement, text: string) {
+  const href = link.getAttribute('data-href');
+  return !!href?.startsWith('@') && text !== href.split('#').join(' > ');
+}
+
 function shiftSegments(segments: Segment[][], by: number) {
   return segments.map((s) =>
     s.map((seg) => ({ ...seg, from: seg.from + by, to: seg.to + by }))
@@ -62,6 +68,7 @@ export function processCiteKeys(plugin: ReferenceList) {
       let segments: Segment[][];
       if (node.parentElement.tagName === 'A') {
         if (!plugin.settings.renderLinkCitations) continue;
+        if (isCitationLinkAlias(node.parentElement, content)) continue;
         const target = linkTargetShownAs(node.parentElement, content);
         if (target) {
           // Parse it as the wikilink it came from, so its `#` starts a subpath
@@ -177,6 +184,7 @@ export function processCiteKeys(plugin: ReferenceList) {
             case SegmentType.locatorLabel:
             case SegmentType.locatorSuffix:
             case SegmentType.linkSubpath:
+            case SegmentType.linkAlias:
               frag.createSpan({
                 cls: `pandoc-citation-formatting ${part.type}`,
                 text: part.val,

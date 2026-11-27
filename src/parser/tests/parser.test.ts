@@ -526,6 +526,30 @@ describe('wikilinks to a heading or block of a note', () => {
     ]);
   });
 
+  it('keeps the alias out of the citation', () => {
+    expect(citationsOf('[[@doe99|(Doe, 1999, p. 4)]]')).toEqual([
+      [{ id: 'doe99' }],
+    ]);
+    expect(citationsOf('[[@doe99|see @smith; @jones]]')).toEqual([
+      [{ id: 'doe99' }],
+    ]);
+    expect(getCitationSegments('[[@doe99|Doe]]')[0][3]).toEqual({
+      from: 8,
+      to: 12,
+      val: '|Doe',
+      type: SegmentType.linkAlias,
+    });
+  });
+
+  it('leaves pipes outside citation wikilinks alone', () => {
+    expect(citationsOf('[[Note|see @doe99]]')).toEqual([
+      [{ id: 'doe99', prefix: 'Note|see' }],
+    ]);
+    expect(citationsOf('[@doe99|x]')).toEqual([
+      [{ id: 'doe99', suffix: ', |x' }],
+    ]);
+  });
+
   it('keeps # in keys outside wikilinks, as pandoc does', () => {
     expect(citationsOf('[@doe#99]')).toEqual([[{ id: 'doe#99' }]]);
     expect(citationsOf('@doe#99 says')).toEqual([
