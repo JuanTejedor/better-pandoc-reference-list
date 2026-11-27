@@ -215,8 +215,11 @@ export const citeKeyPlugin = ViewPlugin.fromClass(
             matched.add(rendered);
           }
 
+          // Obsidian shows the alias of `[[@doe99|Doe]]` in place of the citation
+          const hasAlias = match.some((s) => s.type === SegmentType.linkAlias);
+
           if (isLivePreview) {
-            if (rendered) {
+            if (rendered && !hasAlias) {
               const start = from + match[0].from;
               const end = from + match[match.length - 1].to;
               const center = Math.round((start + end) / 2);
@@ -323,6 +326,8 @@ export const citeKeyPlugin = ViewPlugin.fromClass(
               case SegmentType.locatorSuffix:
               case SegmentType.linkSubpath:
                 b.add(start, end, citeMarkExtra(part.type));
+                continue;
+              case SegmentType.linkAlias:
                 continue;
             }
           }
